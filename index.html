@@ -20,7 +20,6 @@
         .hide-scroll::-webkit-scrollbar { display: none; }
         .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
         .gauge-fill { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
-        /* 비활성화 버튼 스타일 */
         .btn-disabled { background-color: #d1d5db !important; color: #9ca3af !important; cursor: not-allowed; transform: none !important; }
     </style>
 </head>
@@ -196,16 +195,7 @@
             <div class="bg-white rounded-2xl w-full max-w-sm p-6 relative shadow-2xl">
                 <button @click="showHelpPopup = false" class="absolute top-4 right-4 text-gray-300 hover:text-gray-500"><i class="fas fa-times text-xl"></i></button>
                 <h3 class="text-lg font-bold text-gray-800 mb-6 text-center">💡 사용 가이드</h3>
-                
-                <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-center">
-                    <span class="text-red-600 font-bold text-xs block mb-1">⚠️ 주의사항 (필독)</span>
-                    <p class="text-xs text-red-500 leading-tight">
-                        이 앱은 <b>장부</b>일 뿐입니다!<br>
-                        거래 버튼을 눌러도 게임 아이템은 이동하지 않아요.<br>
-                        <b>반드시 게임에서 먼저 교환하고</b> 버튼을 눌러주세요.
-                    </p>
-                </div>
-
+                <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-center"><span class="text-red-600 font-bold text-xs block mb-1">⚠️ 주의사항 (필독)</span><p class="text-xs text-red-500 leading-tight">이 앱은 <b>장부</b>일 뿐입니다!<br>거래 버튼을 눌러도 게임 아이템은 이동하지 않아요.<br><b>반드시 게임에서 먼저 교환하고</b> 버튼을 눌러주세요.</p></div>
                 <div class="space-y-4 text-sm text-gray-600">
                     <div class="flex items-start"><div class="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center font-bold mr-3 flex-shrink-0">1</div><div><span class="font-bold text-gray-800 block mb-0.5">카드 입력</span>앨범에서 <code>+</code> <code>-</code> 로 수량 입력 (자동 저장)</div></div>
                     <div class="flex items-start"><div class="bg-green-100 text-green-600 w-6 h-6 rounded-full flex items-center justify-center font-bold mr-3 flex-shrink-0">2</div><div><span class="font-bold text-gray-800 block mb-0.5">1:1 맞교환</span>친구 리스트에서 <code>비교 ></code>를 누르면 서로 윈윈인 카드가 나옵니다.</div></div>
@@ -252,7 +242,7 @@
                 const loginForm = ref({ server: '', nickname: '', password: '' });
                 const userData = ref(null);
                 const currentAlbumIdx = ref(0);
-                const tradeCount = ref(0); // 일일 교환 횟수
+                const tradeCount = ref(0);
                 
                 const showPopup = ref(false);
                 const showUserListPopup = ref(false);
@@ -288,35 +278,26 @@
                     return list;
                 });
 
-                // 게임 시간 (오전 8시 기준) 날짜 구하기 (YYYY-MM-DD)
                 const getGameDate = () => {
                     const now = new Date();
-                    if (now.getHours() < 8) {
-                        now.setDate(now.getDate() - 1);
-                    }
+                    if (now.getHours() < 8) now.setDate(now.getDate() - 1);
                     return now.toISOString().split('T')[0];
                 };
 
                 const checkAndResetDailyLimit = async () => {
                     if (!userData.value) return;
                     const todayGameDate = getGameDate();
-                    // 날짜가 바뀌었으면 카운트 리셋
                     if (userData.value.dailyExchangeDate !== todayGameDate) {
                         userData.value.dailyExchangeCount = 0;
                         userData.value.dailyExchangeDate = todayGameDate;
                         tradeCount.value = 0;
-                        // DB 업데이트
                         const docId = `S${userData.value.server}_${userData.value.nickname}`;
-                        await db.collection('users').doc(docId).update({
-                            dailyExchangeCount: 0,
-                            dailyExchangeDate: todayGameDate
-                        });
+                        await db.collection('users').doc(docId).update({ dailyExchangeCount: 0, dailyExchangeDate: todayGameDate });
                     } else {
                         tradeCount.value = userData.value.dailyExchangeCount || 0;
                     }
                 };
 
-                // 접속 상태 텍스트
                 const getActiveText = (timestamp) => {
                     if (!timestamp) return '미접속';
                     try {
@@ -354,9 +335,7 @@
                 const updateLastActive = async () => {
                     if (!userData.value || isAdmin.value) return;
                     const docId = `S${userData.value.server}_${userData.value.nickname}`;
-                    await db.collection('users').doc(docId).update({
-                        lastActive: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                    await db.collection('users').doc(docId).update({ lastActive: firebase.firestore.FieldValue.serverTimestamp() });
                 };
 
                 const loadAppConfig = async () => {
@@ -416,9 +395,9 @@
                     showComparePopup.value = true;
                 };
 
-                // [핵심] 거래 실행 로직 (일일 제한 체크)
+                // [핵심] 거래 실행 로직 (쌍방 카운트 + 8시 리셋 체크)
                 const executeTrade = async (card, type) => {
-                    await checkAndResetDailyLimit(); // 최신 날짜 상태 확인
+                    await checkAndResetDailyLimit();
                     
                     if (tradeCount.value >= 3) {
                         alert("오늘 교환 횟수 3회를 모두 소진했습니다.\n내일 오전 8시에 다시 가능해요! 🌙");
@@ -427,12 +406,14 @@
 
                     const actionName = type === 'give' ? `[${card.name}] 을(를) 주시겠습니까?` : `[${card.name}] 을(를) 받으시겠습니까?`;
                     const effect = type === 'give' ? "내 수량 -1 / 상대 수량 +1" : "내 수량 +1 / 상대 수량 -1";
-                    if (!confirm(`${actionName}\n(${effect})\n\n상대방 데이터도 자동으로 변경됩니다!`)) return;
+                    const countEffect = "나와 상대방의 교환 횟수가 1회씩 차감됩니다.";
+                    if (!confirm(`${actionName}\n(${effect})\n\n${countEffect}`)) return;
 
                     isLoading.value = true;
                     try {
                         const myDocRef = db.collection('users').doc(isAdmin.value ? 'MASTER_ADMIN' : `S${userData.value.server}_${userData.value.nickname}`);
                         const targetDocRef = db.collection('users').doc(compareTarget.value.id);
+                        const today = getGameDate();
 
                         await db.runTransaction(async (transaction) => {
                             const myDoc = await transaction.get(myDocRef);
@@ -440,13 +421,24 @@
                             if (!myDoc.exists || !targetDoc.exists) throw "문서 없음";
 
                             const myData = myDoc.data();
-                            // 트랜잭션 내부에서도 다시 한번 카운트 체크 (동시성 제어)
-                            if (myData.dailyExchangeCount >= 3 && myData.dailyExchangeDate === getGameDate()) {
-                                throw "오늘 교환 한도 초과!";
+                            const targetData = targetDoc.data();
+
+                            // 1. 내 횟수 체크
+                            if (myData.dailyExchangeDate === today && myData.dailyExchangeCount >= 3) {
+                                throw "오늘 나의 교환 한도가 초과되었습니다!";
                             }
 
+                            // 2. 상대방 횟수 체크 (상대방 날짜가 오늘이 아니면 0으로 간주)
+                            let targetCount = targetData.dailyExchangeCount || 0;
+                            if (targetData.dailyExchangeDate !== today) targetCount = 0;
+
+                            if (targetCount >= 3) {
+                                throw `상대방(${targetData.nickname}님)의 오늘 교환 횟수가 마감되었습니다.`;
+                            }
+
+                            // 3. 카드 수량 체크 및 변경
                             const myCol = myData.collection;
-                            const targetCol = targetDoc.data().collection;
+                            const targetCol = targetData.collection;
                             const idx = card.index;
 
                             if (type === 'give') {
@@ -457,20 +449,26 @@
                                 myCol[idx]++; targetCol[idx]--;
                             }
                             
-                            // 카운트 증가
-                            const newCount = (myData.dailyExchangeCount || 0) + 1;
-                            
+                            // 4. 쌍방 카운트 증가 업데이트
+                            const myNewCount = (myData.dailyExchangeCount || 0) + 1;
+                            const targetNewCount = targetCount + 1;
+
                             transaction.update(myDocRef, { 
                                 collection: myCol,
-                                dailyExchangeCount: newCount,
-                                dailyExchangeDate: getGameDate()
+                                dailyExchangeCount: myNewCount,
+                                dailyExchangeDate: today
                             });
-                            transaction.update(targetDocRef, { collection: targetCol });
+                            
+                            transaction.update(targetDocRef, { 
+                                collection: targetCol,
+                                dailyExchangeCount: targetNewCount,
+                                dailyExchangeDate: today
+                            });
                             
                             userData.value.collection = myCol;
-                            userData.value.dailyExchangeCount = newCount;
-                            userData.value.dailyExchangeDate = getGameDate();
-                            tradeCount.value = newCount;
+                            userData.value.dailyExchangeCount = myNewCount;
+                            userData.value.dailyExchangeDate = today;
+                            tradeCount.value = myNewCount;
                             compareTarget.value.collection = targetCol;
                         });
                         localStorage.setItem(isAdmin.value ? 'oq_user_admin' : 'oq_user_v4', JSON.stringify(userData.value));
