@@ -122,7 +122,7 @@
                 <button @click="showUserListPopup = false" class="absolute top-4 right-4 text-gray-300 hover:text-gray-500"><i class="fas fa-times"></i></button>
                 <h3 class="text-base font-bold mb-4 text-gray-800">👥 활동 멤버 <span class="text-blue-500">{{ filteredUserList.length }}명</span></h3>
                 <div class="mb-3 relative">
-                    <input v-model="searchKeyword" type="text" placeholder="서버 혹은 닉네임 검색" class="w-full p-2.5 pl-9 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-100 transition">
+                    <input v-model="searchKeyword" type="text" placeholder="닉네임 검색" class="w-full p-2.5 pl-9 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-100 transition">
                     <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-xs"></i>
                 </div>
                 <div v-if="isLoading" class="flex justify-center py-8"><div class="loader"></div></div>
@@ -284,15 +284,26 @@
                     return now.toISOString().split('T')[0];
                 };
 
+                // [핵심 수정] 로그인 시점 및 거래 직전 무조건 자동 초기화
                 const checkAndResetDailyLimit = async () => {
                     if (!userData.value) return;
                     const todayGameDate = getGameDate();
+                    
+                    // DB에 저장된 날짜가 오늘(게임시간)과 다르면 리셋
                     if (userData.value.dailyExchangeDate !== todayGameDate) {
+                        console.log("새로운 날짜! 교환 횟수 초기화");
                         userData.value.dailyExchangeCount = 0;
                         userData.value.dailyExchangeDate = todayGameDate;
                         tradeCount.value = 0;
+                        
+                        // DB에도 즉시 반영
                         const docId = `S${userData.value.server}_${userData.value.nickname}`;
-                        await db.collection('users').doc(docId).update({ dailyExchangeCount: 0, dailyExchangeDate: todayGameDate });
+                        try {
+                            await db.collection('users').doc(docId).update({
+                                dailyExchangeCount: 0,
+                                dailyExchangeDate: todayGameDate
+                            });
+                        } catch(e) { console.error("초기화 실패", e); }
                     } else {
                         tradeCount.value = userData.value.dailyExchangeCount || 0;
                     }
@@ -395,7 +406,6 @@
                     showComparePopup.value = true;
                 };
 
-                // [핵심] 거래 실행 로직 (쌍방 카운트 + 8시 리셋 체크)
                 const executeTrade = async (card, type) => {
                     await checkAndResetDailyLimit();
                     
@@ -423,20 +433,16 @@
                             const myData = myDoc.data();
                             const targetData = targetDoc.data();
 
-                            // 1. 내 횟수 체크
-                            if (myData.dailyExchangeDate === today && myData.dailyExchangeCount >= 3) {
-                                throw "오늘 나의 교환 한도가 초과되었습니다!";
-                            }
+                            let myCurrentCount = myData.dailyExchangeCount || 0;
+                            if (myData.dailyExchangeDate !== today) myCurrentCount = 0;
 
-                            // 2. 상대방 횟수 체크 (상대방 날짜가 오늘이 아니면 0으로 간주)
+                            if (myCurrentCount >= 3) throw "오늘 나의 교환 한도가 초과되었습니다!";
+
                             let targetCount = targetData.dailyExchangeCount || 0;
                             if (targetData.dailyExchangeDate !== today) targetCount = 0;
 
-                            if (targetCount >= 3) {
-                                throw `상대방(${targetData.nickname}님)의 오늘 교환 횟수가 마감되었습니다.`;
-                            }
+                            if (targetCount >= 3) throw `상대방(${targetData.nickname}님)의 오늘 교환 횟수가 마감되었습니다.`;
 
-                            // 3. 카드 수량 체크 및 변경
                             const myCol = myData.collection;
                             const targetCol = targetData.collection;
                             const idx = card.index;
@@ -449,21 +455,11 @@
                                 myCol[idx]++; targetCol[idx]--;
                             }
                             
-                            // 4. 쌍방 카운트 증가 업데이트
-                            const myNewCount = (myData.dailyExchangeCount || 0) + 1;
+                            const myNewCount = myCurrentCount + 1;
                             const targetNewCount = targetCount + 1;
 
-                            transaction.update(myDocRef, { 
-                                collection: myCol,
-                                dailyExchangeCount: myNewCount,
-                                dailyExchangeDate: today
-                            });
-                            
-                            transaction.update(targetDocRef, { 
-                                collection: targetCol,
-                                dailyExchangeCount: targetNewCount,
-                                dailyExchangeDate: today
-                            });
+                            transaction.update(myDocRef, { collection: myCol, dailyExchangeCount: myNewCount, dailyExchangeDate: today });
+                            transaction.update(targetDocRef, { collection: targetCol, dailyExchangeCount: targetNewCount, dailyExchangeDate: today });
                             
                             userData.value.collection = myCol;
                             userData.value.dailyExchangeCount = myNewCount;
@@ -473,7 +469,7 @@
                         });
                         localStorage.setItem(isAdmin.value ? 'oq_user_admin' : 'oq_user_v4', JSON.stringify(userData.value));
                         updateLastActive();
-                        alert("거래 완료! (오늘 남은 횟수: " + (3 - tradeCount.value) + "회)");
+                        alert(`거래 완료! (오늘 ${tradeCount.value}/3회 완료)`);
                         openCompare(compareTarget.value); 
                     } catch (e) { alert("거래 실패: " + e); } 
                     finally { isLoading.value = false; }
@@ -482,8 +478,8 @@
                 const saveAppConfig = async () => { if (!confirm("저장할까요?")) return; try { await db.collection('config').doc('service_info').set(appConfig.value); alert("저장됨"); showAdminPopup.value = false; } catch (e) { alert("실패"); } };
                 const resetAllUsers = async () => { if (!confirm("초기화 하시겠습니까?")) return; isLoading.value = true; try { const snap = await db.collection('users').get(); const updates = []; snap.forEach(doc => updates.push(doc.ref.update({ collection: Array(81).fill(0) }))); await Promise.all(updates); if(userData.value) { userData.value.collection = Array(81).fill(0); localStorage.setItem('oq_user_v4', JSON.stringify(userData.value)); } alert("완료"); showAdminPopup.value = false; } catch (e) {} finally { isLoading.value = false; } };
                 const handleLogin = async () => { if (isLoading.value) return; const { server, nickname, password } = loginForm.value; if (!nickname || !password) { alert('정보 입력!'); return; } if (nickname === '관리자') { if (password !== ADMIN_PASSWORD) { alert("비번 틀림"); return; } await processLogin('MASTER_ADMIN', { nickname: '관리자', server: 0, password: ADMIN_PASSWORD, role: 'admin' }); return; } if (!server) { alert('서버 입력!'); return; } await processLogin(`S${server}_${nickname}`, { nickname, server, password, role: 'user' }); };
-                const processLogin = async (docId, userInfo) => { isLoading.value = true; await loadAppConfig(); const docRef = db.collection('users').doc(docId); try { const doc = await docRef.get(); let finalData; if (doc.exists) { const data = doc.data(); if (data.password !== userInfo.password) { alert('비번 틀림'); isLoading.value = false; return; } if (Array.isArray(data.collection) && Array.isArray(data.collection[0])) data.collection = Array(81).fill(0); finalData = data; } else { finalData = { ...userInfo, collection: Array(81).fill(0), createdAt: firebase.firestore.FieldValue.serverTimestamp(), lastActive: firebase.firestore.FieldValue.serverTimestamp(), dailyExchangeCount: 0, dailyExchangeDate: getGameDate() }; await docRef.set(finalData); } userData.value = finalData; localStorage.setItem('oq_user_v4', JSON.stringify(finalData)); checkAndResetDailyLimit(); updateLastActive(); isLoggedIn.value = true; } catch (e) { alert('오류: ' + e.message); } finally { isLoading.value = false; } };
-                const checkLogin = async () => { const savedUser = localStorage.getItem('oq_user_v4'); if (savedUser) { try { userData.value = JSON.parse(savedUser); await loadAppConfig(); checkAndResetDailyLimit(); isLoggedIn.value = true; updateLastActive(); } catch(e) {} } }; checkLogin();
+                const processLogin = async (docId, userInfo) => { isLoading.value = true; await loadAppConfig(); const docRef = db.collection('users').doc(docId); try { const doc = await docRef.get(); let finalData; if (doc.exists) { const data = doc.data(); if (data.password !== userInfo.password) { alert('비번 틀림'); isLoading.value = false; return; } if (Array.isArray(data.collection) && Array.isArray(data.collection[0])) data.collection = Array(81).fill(0); finalData = data; } else { finalData = { ...userInfo, collection: Array(81).fill(0), createdAt: firebase.firestore.FieldValue.serverTimestamp(), lastActive: firebase.firestore.FieldValue.serverTimestamp(), dailyExchangeCount: 0, dailyExchangeDate: getGameDate() }; await docRef.set(finalData); } userData.value = finalData; localStorage.setItem('oq_user_v4', JSON.stringify(finalData)); await checkAndResetDailyLimit(); updateLastActive(); isLoggedIn.value = true; } catch (e) { alert('오류: ' + e.message); } finally { isLoading.value = false; } };
+                const checkLogin = async () => { const savedUser = localStorage.getItem('oq_user_v4'); if (savedUser) { try { userData.value = JSON.parse(savedUser); await loadAppConfig(); await checkAndResetDailyLimit(); isLoggedIn.value = true; updateLastActive(); } catch(e) {} } }; checkLogin();
                 const logout = () => { localStorage.removeItem('oq_user_v4'); userData.value = null; isLoggedIn.value = false; loginForm.value = { server: '', nickname: '', password: '' }; };
                 const currentAlbumCards = computed(() => userData.value ? userData.value.collection.slice(currentAlbumIdx.value*9, (currentAlbumIdx.value*9)+9) : []);
                 const updateCount = (i, chg) => { if (!userData.value) return; const rIdx = (currentAlbumIdx.value*9)+i; if (userData.value.collection[rIdx]+chg < 0) return; userData.value.collection[rIdx] += chg; localStorage.setItem('oq_user_v4', JSON.stringify(userData.value)); const docId = userData.value.role === 'admin' ? 'MASTER_ADMIN' : `S${userData.value.server}_${userData.value.nickname}`; db.collection('users').doc(docId).update({collection: userData.value.collection}).catch(()=>{}); updateLastActive(); };
@@ -510,4 +506,3 @@
     </script>
 </body>
 </html>
-
