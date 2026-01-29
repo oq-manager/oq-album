@@ -51,6 +51,7 @@
             <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-800">
                 <h1 class="text-lg font-bold text-yellow-400">👑 VIP 관리 모드</h1>
                 <div class="flex gap-2">
+                    <button @click="showAdminPopup = true" class="text-xs bg-gray-600 px-3 py-1 rounded hover:bg-gray-500">⚙️ 설정</button>
                     <button @click="fetchAdminData" class="text-xs bg-gray-700 px-3 py-1 rounded hover:bg-gray-600">🔄 새로고침</button>
                     <button @click="logout" class="text-xs border border-gray-600 px-3 py-1 rounded hover:bg-gray-700">나가기</button>
                 </div>
@@ -59,7 +60,7 @@
             <div class="flex-1 overflow-y-auto p-4">
                 
                 <div class="mb-6">
-                    <label class="block text-xs text-gray-400 mb-2">관리할 유저 선택 (받는 사람)</label>
+                    <label class="block text-xs text-gray-400 mb-2">관리할 유저 선택 (받는 사람 / 삭제 대상)</label>
                     <div class="flex gap-2">
                         <select v-model="adminTargetUserId" @change="calculateAdminMatches" class="flex-1 p-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-yellow-500">
                             <option value="" disabled>선택해주세요</option>
@@ -67,7 +68,6 @@
                                 S{{ user.server }} {{ user.nickname }} (현재 {{ user.totalCount }}/81)
                             </option>
                         </select>
-                        
                         <button v-if="adminTargetUserId" @click="deleteTargetUser" class="bg-red-600 hover:bg-red-700 text-white font-bold px-4 rounded-lg shadow-md transition whitespace-nowrap">
                             <i class="fas fa-trash-alt"></i> 삭제
                         </button>
@@ -266,6 +266,17 @@
                 <button @click="showHelpPopup = false" class="w-full bg-gray-800 text-white py-3 rounded-xl mt-4 font-bold text-sm hover:bg-gray-700">확인했습니다</button>
             </div>
         </div>
+
+        <div v-if="showAdminPopup" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6"><h2 class="text-xl font-bold text-gray-800">🛠 설정</h2><button @click="showAdminPopup = false" class="text-gray-500"><i class="fas fa-times text-xl"></i></button></div>
+                <div class="space-y-6 mb-8">
+                    <div v-for="(name, idx) in appConfig.albumNames" :key="idx" class="border-b pb-4"><label class="block text-sm font-bold text-gray-700 mb-2">앨범 {{ idx + 1 }}</label><div class="grid grid-cols-1 gap-2"><input v-model="appConfig.albumNames[idx]" type="text" class="w-full p-2 border rounded text-sm"><input v-model="appConfig.albumCovers[idx]" type="text" placeholder="이미지 주소" class="w-full p-2 border rounded text-sm text-gray-500"></div></div>
+                </div>
+                <div class="flex justify-end gap-2 mb-8"><button @click="saveAppConfig" class="px-6 py-3 bg-blue-600 text-white rounded font-bold w-full">저장</button></div>
+                <div class="border-t-2 border-red-100 pt-6 mt-6 bg-red-50 p-4 rounded-lg"><button @click="resetAllUsers" class="w-full bg-red-500 text-white py-3 rounded font-bold">🧨 시즌 초기화</button></div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -282,7 +293,7 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-        const { createApp, ref, computed, watch } = Vue;
+        const { createApp, ref, computed } = Vue;
 
         createApp({
             setup() {
@@ -316,131 +327,11 @@
                     albumCovers: Array(9).fill("")
                 });
 
-                const isAdmin = computed(() => userData.value && userData.value.role === 'admin');
-                const filteredUserList = computed(() => {
-                    if (!userList.value.length) return [];
-                    let list = userList.value;
-                    if (searchKeyword.value) {
-                        const keyword = searchKeyword.value.toLowerCase();
-                        list = list.filter(user => user.nickname.toLowerCase().includes(keyword) || String(user.server).includes(keyword));
-                    }
-                    list.sort((a, b) => {
-                        const timeA = a.lastActive ? a.lastActive.toMillis() : 0;
-                        const timeB = b.lastActive ? b.lastActive.toMillis() : 0;
-                        return timeB - timeA;
-                    });
-                    return list;
-                });
-
+                // 도구 함수 최상단 배치
                 const getGameDate = () => {
                     const now = new Date();
                     if (now.getHours() < 8) now.setDate(now.getDate() - 1);
                     return now.toISOString().split('T')[0];
-                };
-
-                const checkAndResetDailyLimit = async () => {
-                    if (!userData.value || isAdmin.value) return;
-                    const todayGameDate = getGameDate();
-                    if (userData.value.dailyExchangeDate !== todayGameDate) {
-                        userData.value.dailyExchangeCount = 0;
-                        userData.value.dailyExchangeDate = todayGameDate;
-                        tradeCount.value = 0;
-                        const docId = `S${userData.value.server}_${userData.value.nickname}`;
-                        try { await db.collection('users').doc(docId).update({ dailyExchangeCount: 0, dailyExchangeDate: todayGameDate }); } catch(e) {}
-                    } else {
-                        tradeCount.value = userData.value.dailyExchangeCount || 0;
-                    }
-                };
-
-                const fetchAdminData = async () => {
-                    if (!isAdmin.value) return;
-                    isLoading.value = true;
-                    adminUserList.value = [];
-                    adminMatchList.value = [];
-                    adminTargetUserId.value = '';
-                    try {
-                        const snapshot = await db.collection('users').get();
-                        const users = [];
-                        snapshot.forEach(doc => {
-                            const u = doc.data();
-                            if (u.role !== 'admin') {
-                                const total = (u.collection || []).reduce((a, b) => a + (b>0?1:0), 0);
-                                if (total > 0) {
-                                    users.push({ id: doc.id, ...u, totalCount: total });
-                                }
-                            }
-                        });
-                        users.sort((a, b) => a.nickname.localeCompare(b.nickname));
-                        adminUserList.value = users;
-                    } catch (e) { alert("데이터 로드 실패"); }
-                    finally { isLoading.value = false; }
-                };
-
-                const calculateAdminMatches = () => {
-                    if (!adminTargetUserId.value) return;
-                    const targetUser = adminUserList.value.find(u => u.id === adminTargetUserId.value);
-                    if (!targetUser) return;
-                    const matches = [];
-                    adminUserList.value.forEach(donor => {
-                        if (donor.id === targetUser.id) return;
-                        const giveable = [];
-                        for(let i=0; i<81; i++) {
-                            if ((donor.collection[i] || 0) > 1 && (targetUser.collection[i] || 0) === 0) {
-                                const aIdx = Math.floor(i/9);
-                                const albumName = appConfig.value.albumNames[aIdx] || `앨범${aIdx+1}`;
-                                giveable.push({ index: i, name: `${albumName} - 사진${(i%9)+1}` });
-                            }
-                        }
-                        if (giveable.length > 0) { matches.push({ user: donor, giveable }); }
-                    });
-                    adminMatchList.value = matches;
-                };
-
-                // [추가] 관리자 모드 - 유저 삭제
-                const deleteTargetUser = async () => {
-                    if (!adminTargetUserId.value) return;
-                    const target = adminUserList.value.find(u => u.id === adminTargetUserId.value);
-                    if (!target) return;
-                    
-                    if (!confirm(`🚨 정말 [S${target.server} ${target.nickname}] 님을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며, 모든 데이터가 영구적으로 삭제됩니다.`)) return;
-
-                    isLoading.value = true;
-                    try {
-                        await db.collection('users').doc(adminTargetUserId.value).delete();
-                        alert("삭제되었습니다.");
-                        // 데이터 새로고침 및 선택 초기화
-                        await fetchAdminData();
-                    } catch (e) {
-                        alert("삭제 실패: " + e);
-                    } finally {
-                        isLoading.value = false;
-                    }
-                };
-
-                const executeAdminTransfer = async (match) => {
-                    if (!confirm(`S${match.user.server} ${match.user.nickname}님의 카드 ${match.giveable.length}장을 가져오시겠습니까?`)) return;
-                    isLoading.value = true;
-                    try {
-                        const targetUserRef = db.collection('users').doc(adminTargetUserId.value);
-                        const donorUserRef = db.collection('users').doc(match.user.id);
-                        await db.runTransaction(async (t) => {
-                            const targetDoc = await t.get(targetUserRef);
-                            const donorDoc = await t.get(donorUserRef);
-                            if (!targetDoc.exists || !donorDoc.exists) throw "유저 정보 없음";
-                            const targetCol = targetDoc.data().collection;
-                            const donorCol = donorDoc.data().collection;
-                            match.giveable.forEach(card => {
-                                const idx = card.index;
-                                if (donorCol[idx] > 1) { donorCol[idx]--; targetCol[idx]++; }
-                            });
-                            t.update(targetUserRef, { collection: targetCol });
-                            t.update(donorUserRef, { collection: donorCol });
-                        });
-                        alert("이동 완료! ⚡");
-                        await fetchAdminData();
-                        adminTargetUserId.value = ''; 
-                    } catch (e) { alert("오류 발생: " + e); }
-                    finally { isLoading.value = false; }
                 };
 
                 const getActiveText = (timestamp) => {
@@ -455,6 +346,7 @@
                         return `${Math.floor(diff / day)}일 전`;
                     } catch(e) { return '미접속'; }
                 };
+
                 const getActiveColor = (timestamp) => {
                     if (!timestamp) return 'bg-gray-300';
                     try {
@@ -483,116 +375,117 @@
                     await db.collection('users').doc(docId).update({ lastActive: firebase.firestore.FieldValue.serverTimestamp() });
                 };
 
-                const loadAppConfig = async () => {
-                    try {
-                        const doc = await db.collection('config').doc('service_info').get();
-                        if (doc.exists) {
-                            const data = doc.data();
-                            if(data.albumNames) appConfig.value.albumNames = data.albumNames;
-                            if(data.albumCovers) appConfig.value.albumCovers = data.albumCovers;
-                        }
-                    } catch (e) {}
+                const isAdmin = computed(() => userData.value && userData.value.role === 'admin');
+                const filteredUserList = computed(() => {
+                    if (!userList.value.length) return [];
+                    let list = userList.value;
+                    if (searchKeyword.value) {
+                        const keyword = searchKeyword.value.toLowerCase();
+                        list = list.filter(user => user.nickname.toLowerCase().includes(keyword) || String(user.server).includes(keyword));
+                    }
+                    list.sort((a, b) => {
+                        const timeA = a.lastActive ? a.lastActive.toMillis() : 0;
+                        const timeB = b.lastActive ? b.lastActive.toMillis() : 0;
+                        return timeB - timeA;
+                    });
+                    return list;
+                });
+
+                const checkAndResetDailyLimit = async () => {
+                    if (!userData.value || isAdmin.value) return; 
+                    const todayGameDate = getGameDate();
+                    if (userData.value.dailyExchangeDate !== todayGameDate) {
+                        userData.value.dailyExchangeCount = 0;
+                        userData.value.dailyExchangeDate = todayGameDate;
+                        tradeCount.value = 0;
+                        const docId = `S${userData.value.server}_${userData.value.nickname}`;
+                        try { await db.collection('users').doc(docId).update({ dailyExchangeCount: 0, dailyExchangeDate: todayGameDate }); } catch(e) {}
+                    } else {
+                        tradeCount.value = userData.value.dailyExchangeCount || 0;
+                    }
                 };
 
-                const fetchUsersAndShowList = async () => {
-                    showUserListPopup.value = true;
+                const fetchAdminData = async () => {
+                    if (!isAdmin.value) return;
                     isLoading.value = true;
-                    searchKeyword.value = '';
-                    userList.value = [];
+                    adminUserList.value = [];
+                    adminMatchList.value = [];
+                    adminTargetUserId.value = '';
                     try {
                         const snapshot = await db.collection('users').get();
                         const users = [];
                         snapshot.forEach(doc => {
                             const u = doc.data();
-                            if (u.nickname !== userData.value.nickname && u.role !== 'admin') {
+                            if (u.role !== 'admin') {
                                 const total = (u.collection || []).reduce((a, b) => a + (b>0?1:0), 0);
-                                if (total > 0) {
-                                    users.push({ id: doc.id, ...u, totalCount: total });
-                                }
+                                users.push({ id: doc.id, ...u, totalCount: total });
                             }
                         });
-                        userList.value = users;
-                    } catch (e) { alert("리스트 로드 실패"); } 
+                        users.sort((a, b) => a.nickname.localeCompare(b.nickname));
+                        adminUserList.value = users;
+                    } catch (e) { alert("데이터 로드 실패"); }
                     finally { isLoading.value = false; }
                 };
 
-                const openCompare = (targetUser) => {
-                    showUserListPopup.value = false;
-                    showPopup.value = false;
-                    compareTarget.value = targetUser;
-                    const myCol = userData.value.collection || Array(81).fill(0);
-                    const targetCol = targetUser.collection || Array(81).fill(0);
-                    const res = { mutual: { give: [], receive: [] }, giveOnly: [], receiveOnly: [] };
-                    for(let i=0; i<81; i++) {
-                        const aIdx = Math.floor(i/9);
-                        const cIdx = (i%9)+1;
-                        const albumName = appConfig.value.albumNames[aIdx] || `앨범${aIdx+1}`;
-                        const cardName = `${albumName} - 사진${cIdx}`;
-                        const cardObj = { index: i, name: cardName };
-                        const iHaveSpare = myCol[i] > 1; const iNeed = myCol[i] === 0;
-                        const uHaveSpare = targetCol[i] > 1; const uNeed = targetCol[i] === 0;
-                        if (iHaveSpare && uNeed) res.giveOnly.push(cardObj);
-                        if (uHaveSpare && iNeed) res.receiveOnly.push(cardObj);
-                    }
-                    if (res.giveOnly.length > 0 && res.receiveOnly.length > 0) {
-                        res.mutual.give = [...res.giveOnly];
-                        res.mutual.receive = [...res.receiveOnly];
-                    }
-                    compareResult.value = res;
-                    showComparePopup.value = true;
+                const calculateAdminMatches = () => {
+                    if (!adminTargetUserId.value) return;
+                    const targetUser = adminUserList.value.find(u => u.id === adminTargetUserId.value);
+                    if (!targetUser) return;
+                    const matches = [];
+                    adminUserList.value.forEach(donor => {
+                        if (donor.id === targetUser.id) return;
+                        const giveable = [];
+                        for(let i=0; i<81; i++) {
+                            if ((donor.collection[i] || 0) > 1 && (targetUser.collection[i] || 0) === 0) {
+                                const aIdx = Math.floor(i/9);
+                                const albumName = appConfig.value.albumNames[aIdx] || `앨범${aIdx+1}`;
+                                giveable.push({ index: i, name: `${albumName} - 사진${(i%9)+1}` });
+                            }
+                        }
+                        if (giveable.length > 0) { matches.push({ user: donor, giveable }); }
+                    });
+                    adminMatchList.value = matches;
                 };
 
-                const executeTrade = async (card, type) => {
-                    await checkAndResetDailyLimit();
-                    if (tradeCount.value >= 3) { alert("오늘 교환 횟수 3회를 모두 소진했습니다.\n내일 오전 8시에 다시 가능해요! 🌙"); return; }
-                    const actionName = type === 'give' ? `[${card.name}] 을(를) 주시겠습니까?` : `[${card.name}] 을(를) 받으시겠습니까?`;
-                    const effect = type === 'give' ? "내 수량 -1 / 상대 수량 +1" : "내 수량 +1 / 상대 수량 -1";
-                    if (!confirm(`${actionName}\n(${effect})\n\n나와 상대방의 교환 횟수가 1회씩 차감됩니다.`)) return;
+                const deleteTargetUser = async () => {
+                    if (!adminTargetUserId.value) return;
+                    const target = adminUserList.value.find(u => u.id === adminTargetUserId.value);
+                    if (!target) return;
+                    if (!confirm(`🚨 정말 [S${target.server} ${target.nickname}] 님을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며, 모든 데이터가 영구적으로 삭제됩니다.`)) return;
                     isLoading.value = true;
                     try {
-                        const myDocRef = db.collection('users').doc(isAdmin.value ? 'MASTER_ADMIN' : `S${userData.value.server}_${userData.value.nickname}`);
-                        const targetDocRef = db.collection('users').doc(compareTarget.value.id);
-                        const today = getGameDate();
-                        await db.runTransaction(async (transaction) => {
-                            const myDoc = await transaction.get(myDocRef);
-                            const targetDoc = await transaction.get(targetDocRef);
-                            if (!myDoc.exists || !targetDoc.exists) throw "문서 없음";
-                            const myData = myDoc.data();
-                            const targetData = targetDoc.data();
-                            let myCurrentCount = myData.dailyExchangeCount || 0;
-                            if (myData.dailyExchangeDate !== today) myCurrentCount = 0;
-                            if (myCurrentCount >= 3) throw "오늘 나의 교환 한도가 초과되었습니다!";
-                            let targetCount = targetData.dailyExchangeCount || 0;
-                            if (targetData.dailyExchangeDate !== today) targetCount = 0;
-                            if (targetCount >= 3) throw `상대방(${targetData.nickname}님)의 오늘 교환 횟수가 마감되었습니다.`;
-                            const myCol = myData.collection;
-                            const targetCol = targetData.collection;
-                            const idx = card.index;
-                            if (type === 'give') {
-                                if (myCol[idx] < 1) throw "오류: 내 카드가 부족해요!";
-                                myCol[idx]--; targetCol[idx]++;
-                            } else {
-                                if (targetCol[idx] < 1) throw "오류: 상대방 카드가 부족해요!";
-                                myCol[idx]++; targetCol[idx]--;
-                            }
-                            const myNewCount = myCurrentCount + 1;
-                            const targetNewCount = targetCount + 1;
-                            transaction.update(myDocRef, { collection: myCol, dailyExchangeCount: myNewCount, dailyExchangeDate: today });
-                            transaction.update(targetDocRef, { collection: targetCol, dailyExchangeCount: targetNewCount, dailyExchangeDate: today });
-                            userData.value.collection = myCol;
-                            userData.value.dailyExchangeCount = myNewCount;
-                            userData.value.dailyExchangeDate = today;
-                            tradeCount.value = myNewCount;
-                            compareTarget.value.collection = targetCol;
+                        await db.collection('users').doc(adminTargetUserId.value).delete();
+                        alert("삭제되었습니다.");
+                        await fetchAdminData();
+                    } catch (e) { alert("삭제 실패: " + e); } finally { isLoading.value = false; }
+                };
+
+                const executeAdminTransfer = async (match) => {
+                    if (!confirm(`S${match.user.server} ${match.user.nickname}님의 카드 ${match.giveable.length}장을 가져오시겠습니까?`)) return;
+                    isLoading.value = true;
+                    try {
+                        const targetUserRef = db.collection('users').doc(adminTargetUserId.value);
+                        const donorUserRef = db.collection('users').doc(match.user.id);
+                        await db.runTransaction(async (t) => {
+                            const targetDoc = await t.get(targetUserRef);
+                            const donorDoc = await t.get(donorUserRef);
+                            if (!targetDoc.exists || !donorDoc.exists) throw "유저 정보 없음";
+                            const targetCol = targetDoc.data().collection;
+                            const donorCol = donorDoc.data().collection;
+                            match.giveable.forEach(card => {
+                                const idx = card.index;
+                                if (donorCol[idx] > 1) { donorCol[idx]--; targetCol[idx]++; }
+                            });
+                            t.update(targetUserRef, { collection: targetCol });
+                            t.update(donorUserRef, { collection: donorCol });
                         });
-                        localStorage.setItem(isAdmin.value ? 'oq_user_admin' : 'oq_user_v4', JSON.stringify(userData.value));
-                        updateLastActive();
-                        alert(`거래 완료! (오늘 ${tradeCount.value}/3회 완료)`);
-                        openCompare(compareTarget.value); 
-                    } catch (e) { alert("거래 실패: " + e); } 
+                        alert("이동 완료! ⚡");
+                        await fetchAdminData();
+                        adminTargetUserId.value = ''; 
+                    } catch (e) { alert("오류 발생: " + e); }
                     finally { isLoading.value = false; }
                 };
-                
+
                 const saveAppConfig = async () => { if (!confirm("저장할까요?")) return; try { await db.collection('config').doc('service_info').set(appConfig.value); alert("저장됨"); showAdminPopup.value = false; } catch (e) { alert("실패"); } };
                 const resetAllUsers = async () => { if (!confirm("초기화 하시겠습니까?")) return; isLoading.value = true; try { const snap = await db.collection('users').get(); const updates = []; snap.forEach(doc => updates.push(doc.ref.update({ collection: Array(81).fill(0) }))); await Promise.all(updates); if(userData.value) { userData.value.collection = Array(81).fill(0); localStorage.setItem('oq_user_v4', JSON.stringify(userData.value)); } alert("완료"); showAdminPopup.value = false; } catch (e) {} finally { isLoading.value = false; } };
                 const handleLogin = async () => { if (isLoading.value) return; const { server, nickname, password } = loginForm.value; if (!nickname || !password) { alert('정보 입력!'); return; } if (nickname === '관리자') { if (password !== ADMIN_PASSWORD) { alert("비번 틀림"); return; } await processLogin('MASTER_ADMIN', { nickname: '관리자', server: 0, password: ADMIN_PASSWORD, role: 'admin' }); return; } if (!server) { alert('서버 입력!'); return; } await processLogin(`S${server}_${nickname}`, { nickname, server, password, role: 'user' }); };
