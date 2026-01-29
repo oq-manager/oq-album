@@ -132,8 +132,17 @@
                             <div class="w-2 h-2 rounded-full mr-2" :class="getActiveColor(user.lastActive)"></div>
                             <span class="bg-blue-100 text-blue-600 text-[10px] px-1.5 py-0.5 rounded font-bold mr-2">S{{ user.server }}</span>
                             <div class="flex flex-col">
-                                <span class="font-bold text-gray-700 text-sm group-hover:text-blue-600">{{ user.nickname }}</span>
-                                <span class="text-[9px] text-gray-400">{{ getActiveText(user.lastActive) }}</span>
+                                <span class="font-bold text-gray-700 text-sm group-hover:text-blue-600 flex items-center">
+                                    {{ user.nickname }}
+                                    <i v-if="user.totalCount >= 81" class="fas fa-trophy text-yellow-500 ml-1 text-xs"></i>
+                                </span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[9px] text-gray-400">{{ getActiveText(user.lastActive) }}</span>
+                                    <span class="text-[10px] px-1.5 rounded-full" 
+                                          :class="user.totalCount >= 40 ? 'bg-pink-100 text-pink-600 font-bold' : 'bg-gray-100 text-gray-500'">
+                                        {{ user.totalCount || 0 }}/81
+                                    </span>
+                                </div>
                             </div>
                         </div>
                         <span class="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-500 group-hover:bg-blue-200 group-hover:text-blue-700 transition">비교 ></span>
@@ -284,26 +293,16 @@
                     return now.toISOString().split('T')[0];
                 };
 
-                // [핵심 수정] 로그인 시점 및 거래 직전 무조건 자동 초기화
                 const checkAndResetDailyLimit = async () => {
                     if (!userData.value) return;
                     const todayGameDate = getGameDate();
-                    
-                    // DB에 저장된 날짜가 오늘(게임시간)과 다르면 리셋
                     if (userData.value.dailyExchangeDate !== todayGameDate) {
                         console.log("새로운 날짜! 교환 횟수 초기화");
                         userData.value.dailyExchangeCount = 0;
                         userData.value.dailyExchangeDate = todayGameDate;
                         tradeCount.value = 0;
-                        
-                        // DB에도 즉시 반영
                         const docId = `S${userData.value.server}_${userData.value.nickname}`;
-                        try {
-                            await db.collection('users').doc(docId).update({
-                                dailyExchangeCount: 0,
-                                dailyExchangeDate: todayGameDate
-                            });
-                        } catch(e) { console.error("초기화 실패", e); }
+                        try { await db.collection('users').doc(docId).update({ dailyExchangeCount: 0, dailyExchangeDate: todayGameDate }); } catch(e) { console.error("초기화 실패", e); }
                     } else {
                         tradeCount.value = userData.value.dailyExchangeCount || 0;
                     }
@@ -371,8 +370,11 @@
                         snapshot.forEach(doc => {
                             const u = doc.data();
                             if (u.nickname !== userData.value.nickname && u.role !== 'admin') {
-                                const total = u.collection ? u.collection.reduce((a, b) => a + b, 0) : 0;
-                                if (total > 0) users.push({ id: doc.id, ...u });
+                                const collection = u.collection || [];
+                                const totalCount = collection.reduce((a, b) => a + (b > 0 ? 1 : 0), 0); // 보유한 "종류"의 개수
+                                if (totalCount > 0) {
+                                    users.push({ id: doc.id, ...u, totalCount });
+                                }
                             }
                         });
                         userList.value = users;
@@ -490,7 +492,7 @@
                 const prevAlbum = () => { if(currentAlbumIdx.value > 0) currentAlbumIdx.value--; };
                 const nextAlbum = () => { if(currentAlbumIdx.value < 8) currentAlbumIdx.value++; };
                 
-                const checkExchange = async (i) => { const rIdx = (currentAlbumIdx.value*9)+i; if (userData.value.collection[rIdx]>0) return; targetCardIdx.value = i; showPopup.value = true; exchangeList.value = []; isLoading.value = true; try { const snap = await db.collection('users').get(); const matches = []; snap.forEach(doc => { const u = doc.data(); if(u.nickname === userData.value.nickname) return; if(u.collection && u.collection[rIdx] > 1) { const giveable = []; for(let k=0; k<81; k++) { if(userData.value.collection[k]>1 && u.collection[k]===0) { const aIdx = Math.floor(k/9); const albumName = appConfig.value.albumNames[aIdx] || `앨범${aIdx+1}`; giveable.push(`${albumName} - 사진${(k%9)+1}`); } } matches.push({id:doc.id, server:u.server, nickname:u.nickname, collection: u.collection, giveable}); } }); exchangeList.value = matches; } catch(e){} finally { isLoading.value = false; } };
+                const checkExchange = async (i) => { const rIdx = (currentAlbumIdx.value*9)+i; if (userData.value.collection[rIdx]>0) return; targetCardCardIdx.value = i; showPopup.value = true; exchangeList.value = []; isLoading.value = true; try { const snap = await db.collection('users').get(); const matches = []; snap.forEach(doc => { const u = doc.data(); if(u.nickname === userData.value.nickname) return; if(u.collection && u.collection[rIdx] > 1) { const giveable = []; for(let k=0; k<81; k++) { if(userData.value.collection[k]>1 && u.collection[k]===0) { const aIdx = Math.floor(k/9); const albumName = appConfig.value.albumNames[aIdx] || `앨범${aIdx+1}`; giveable.push(`${albumName} - 사진${(k%9)+1}`); } } matches.push({id:doc.id, server:u.server, nickname:u.nickname, collection: u.collection, giveable}); } }); exchangeList.value = matches; } catch(e){} finally { isLoading.value = false; } };
 
                 return { 
                     isLoggedIn, isLoading, loginForm, handleLogin, logout, userData, isAdmin,
