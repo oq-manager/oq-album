@@ -585,6 +585,7 @@
     appId: "1:936201723618:web:e4ec53040d668f023988bb",
     measurementId: "G-CEENHZG8HZ"
   };
+  const ADMIN_PASSWORD = "1299";
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
@@ -638,20 +639,6 @@
         albumCovers: Array(9).fill("")
       });
 
-      // --- admin password utils (SHA-256) ---
-    const sha256 = async (text) => {
-      const enc = new TextEncoder().encode(String(text || ''));
-      const buf = await crypto.subtle.digest('SHA-256', enc);
-      const arr = Array.from(new Uint8Array(buf));
-      return arr.map(b => b.toString(16).padStart(2, '0')).join('');};
-
-    const getAdminPasswordHashFromDB = async () => {
-      const doc = await db.collection('config').doc('admin').get();
-      if (!doc.exists) throw new Error("관리자 설정(config/admin)이 없습니다.");
-      const data = doc.data() || {};
-      if (!data.passwordHash) throw new Error("config/admin.passwordHash가 비어있습니다.");
-      return String(data.passwordHash).trim();};
-      
       const isAdmin = computed(() => userData.value && userData.value.role === 'admin');
 
       const safeNick = (v) => (v || '').toString().trim();
@@ -1285,25 +1272,11 @@
         if (!/^\d{4}$/.test(password)) { alert('비밀번호는 숫자 4자리!'); return; }
         if (/\s/.test(nickname)) { alert("닉네임에 공백은 안돼요!"); return; }
 
-if (nickname === '관리자') {
-  try {
-    // 1) DB에 저장된 관리자 비번 해시 가져오기
-    const savedHash = await getAdminPasswordHashFromDB();
-
-    // 2) 사용자가 입력한 비번을 해시로 변환
-    const inputHash = await sha256(password);
-
-    // 3) 비교
-    if (inputHash !== savedHash) { alert("비번 틀림"); return; }
-
-    // 4) 관리자 로그인 처리
-    await processLogin('MASTER_ADMIN', { nickname: '관리자', server: 0, password: '***', role: 'admin' });
-    return;
-  } catch (e) {
-    alert("관리자 인증 오류: " + (e.message || e));
-    return;
-  }
-}
+        if (nickname === '관리자') {
+          if (password !== ADMIN_PASSWORD) { alert("비번 틀림"); return; }
+          await processLogin('MASTER_ADMIN', { nickname: '관리자', server: 0, password: ADMIN_PASSWORD, role: 'admin' });
+          return;
+        }
 
         server = safeServer(server);
         if (!server) { alert('서버 입력!'); return; }
@@ -1419,5 +1392,3 @@ if (nickname === '관리자') {
 </script>
 </body>
 </html>
-
-
