@@ -592,7 +592,9 @@
       // ✅ "시소 전용": 67섭 + 닉네임 "시소"
       const canEditAlbumConfig = computed(() => {
         if (!userData.value) return false;
-        return Number(userData.value.server) === 67 && String(userData.value.nickname) === '시소';
+        const server = Number(userData.value.server);
+        const nick = String(userData.value.nickname || '').trim();  // ✅ 공백 제거
+        return server === 67 && nick === '시소';
       });
 
       const getGameDate = () => {
@@ -1240,3 +1242,4 @@
 </script>
 </body>
 </html>
+
