@@ -25,12 +25,39 @@
     .tab-btn { font-size: 11px; font-weight: 800; padding: 8px 10px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.08); }
     .tab-on { background: #111827; color: white; border-color: #111827; }
     .tab-off { background: #f3f4f6; color: #374151; }
+
+    /* ✅ 오른쪽 아래 플로팅 버튼 (67섭 시소 전용) */
+    .fab-wrap {
+      position: fixed;
+      right: 14px;
+      bottom: 16px;
+      z-index: 60;
+      width: min(92vw, 420px);
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      display: flex;
+      justify-content: flex-end;
+      padding: 0 14px;
+    }
+    .fab-btn {
+      pointer-events: auto;
+      width: 54px;
+      height: 54px;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 14px 30px rgba(0,0,0,0.18);
+      border: 1px solid rgba(255,255,255,0.22);
+    }
   </style>
 </head>
 
 <body>
 <div id="app" v-cloak class="max-w-md mx-auto bg-white min-h-screen shadow-xl relative flex flex-col overflow-hidden">
 
+  <!-- 로그인 -->
   <div v-if="!isLoggedIn" class="p-8 flex flex-col justify-center h-screen bg-pink-50 relative">
     <button @click="showHelpPopup = true" class="absolute top-4 right-4 text-gray-400 text-sm flex flex-col items-center">
       <i class="fas fa-question-circle text-xl mb-1"></i><span class="text-xs">도움말</span>
@@ -52,180 +79,26 @@
     <p class="text-xs text-gray-400 text-center mt-6">서버/닉네임 입력 시 자동 가입됩니다.</p>
   </div>
 
-  <div v-else-if="isAdmin" class="flex flex-col h-screen bg-gray-900 text-white">
-    <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-800">
-      <h1 class="text-lg font-extrabold text-yellow-400 leading-none">관리자 모드</h1>
-      <div class="flex gap-2">
-        <button @click="showAdminSettingsPopup = true" class="text-xs bg-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-600 btn-press flex items-center gap-1">
-          <i class="fas fa-cog"></i><span>설정</span>
-        </button>
-        <button @click="fetchAdminData" class="text-xs bg-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-600 btn-press flex items-center gap-1">
-          <i class="fas fa-rotate"></i><span>새로고침</span>
-        </button>
-        <button @click="logout" class="text-xs border border-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-700 btn-press">나가기</button>
-      </div>
-    </div>
-
-    <div class="p-3 bg-gray-900 border-b border-gray-800">
-      <div class="grid grid-cols-3 gap-2">
-        <button @click="adminTab='transfer'" class="tab-btn" :class="adminTab==='transfer' ? 'tab-on' : 'tab-off'">
-          ⚡ 카드 몰아주기
-        </button>
-        <button @click="adminTab='users'" class="tab-btn" :class="adminTab==='users' ? 'tab-on' : 'tab-off'">
-          🧹 유저 삭제
-        </button>
-        <button @click="adminTab='reset'" class="tab-btn" :class="adminTab==='reset' ? 'tab-on' : 'tab-off'">
-          🔥 시즌 초기화
-        </button>
-      </div>
-    </div>
-
-    <div class="flex-1 overflow-y-auto p-4 hide-scroll">
-
-      <div v-if="adminTab==='transfer'">
-        <div class="mb-6">
-          <label class="block text-xs text-gray-400 mb-2">관리할 유저 선택 (받는 사람)</label>
-          <select v-model="adminTargetUserId" @change="calculateAdminMatches" class="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-yellow-500">
-            <option value="" disabled>선택해주세요</option>
-            <option v-for="user in adminUserList" :key="user.id" :value="user.id">
-              S{{ user.server }} {{ user.nickname }} ({{ user.totalCount }}/81)
-            </option>
-          </select>
-          <p class="text-[10px] text-gray-500 mt-2">* 관리자에서는 카드 0장 유저도 포함해 전체 로드됩니다.</p>
-        </div>
-
-        <div v-if="adminTargetUserId">
-          <h3 class="text-sm font-extrabold text-gray-300 mb-3 border-l-4 border-yellow-500 pl-2">
-            발견된 잉여 자원 (줄 수 있는 사람들)
-          </h3>
-
-          <div v-if="adminMatchList.length === 0" class="text-center py-10 text-gray-500 bg-gray-800 rounded-lg border border-gray-700">
-            <div class="text-2xl mb-2">🤷‍♂️</div>
-            줄 수 있는 카드가 없거나,<br>이미 다 모으셨네요!
-          </div>
-
-          <div v-else class="space-y-3">
-            <div v-for="(match, idx) in adminMatchList" :key="idx" class="bg-gray-800 border border-gray-700 rounded-lg p-4 shadow-lg">
-              <div class="flex justify-between items-start mb-3">
-                <div>
-                  <span class="text-xs text-blue-400 font-extrabold block mb-1">주는 사람</span>
-                  <span class="text-lg font-extrabold">S{{ match.user.server }} {{ match.user.nickname }}</span>
-                </div>
-                <button @click="executeAdminTransfer(match)"
-                        class="bg-yellow-500 hover:bg-yellow-600 text-black font-extrabold px-4 py-2 rounded text-xs shadow-md transition flex items-center btn-press">
-                  <i class="fas fa-bolt mr-1"></i> {{ match.giveable.length }}장 가져오기
-                </button>
-              </div>
-
-              <div class="bg-gray-900 rounded p-2 text-xs text-gray-200">
-                <div class="flex flex-wrap gap-1">
-                  <span v-for="(card, cIdx) in match.giveable" :key="cIdx"
-                        class="bg-gray-700 text-gray-100 px-2 py-1 rounded border border-gray-600">
-                    {{ card.name }}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="text-center py-16 text-gray-500">
-          <i class="fas fa-user-cog text-4xl mb-4"></i><br>
-          유저를 선택하면<br><b>카드 몰아주기</b>가 가능합니다.
-        </div>
-      </div>
-
-      <div v-else-if="adminTab==='users'">
-        <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 mb-4">
-          <div class="text-sm font-extrabold mb-1">🧹 잘못 가입된 유저 정리</div>
-          <div class="text-[11px] text-gray-300 leading-relaxed">
-            아래 리스트는 <b class="text-yellow-300">카드 0장</b> 유저만 보여요.<br>
-            여기서 <b>삭제</b>만 가능합니다.
-          </div>
-        </div>
-
-        <div v-if="isLoading" class="flex justify-center py-10"><div class="loader"></div></div>
-
-        <div v-else class="space-y-2">
-          <div v-for="u in adminZeroUsers" :key="u.id" class="bg-gray-800 border border-gray-700 rounded-xl p-3 flex items-center justify-between">
-            <div class="flex flex-col">
-              <div class="font-extrabold text-sm">
-                <span class="text-[10px] bg-blue-900/60 text-blue-200 px-2 py-0.5 rounded mr-2">S{{ u.server }}</span>
-                {{ u.nickname }}
-              </div>
-              <div class="text-[10px] text-gray-400 mt-1">마지막 활동: {{ getActiveText(u.lastActive) }}</div>
-            </div>
-
-            <button @click="adminDeleteUser(u)"
-                    class="text-[11px] bg-red-500 hover:bg-red-600 px-3 py-2 rounded-lg font-extrabold btn-press">
-              삭제
-            </button>
-          </div>
-
-          <div v-if="adminZeroUsers.length===0" class="text-center text-gray-400 py-14 bg-gray-800 rounded-xl border border-gray-700">
-            <div class="text-2xl mb-2">✅</div>
-            카드 0장 유저가 없어요!
-          </div>
-        </div>
-      </div>
-
-      <div v-else class="space-y-4">
-        <div class="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <div class="flex items-center gap-2 mb-2">
-            <span class="text-xl">🔥</span>
-            <div class="text-sm font-extrabold text-white">시즌 이벤트 초기화 (새 게임 시작)</div>
-          </div>
-          <div class="text-[11px] text-gray-300 leading-relaxed mb-3">
-            모든 일반 유저의 데이터를 초기화합니다.<br>
-            <span class="text-yellow-400 font-bold">카드 컬렉션, 교환 횟수</span>가 모두 0이 됩니다.<br>
-            <span class="text-red-400 font-extrabold underline">※ 복구가 불가능하니 신중하게 사용하세요.</span>
-          </div>
-
-          <div class="bg-gray-900/50 rounded-lg p-3 border border-gray-600">
-            <div class="text-[10px] text-gray-400 mb-1 font-bold">초기화 항목</div>
-            <ul class="text-[11px] text-gray-200 space-y-1 list-disc list-inside">
-              <li>모든 카드 수량 → 0개</li>
-              <li>오늘 교환 횟수 → 0회</li>
-              <li>마지막 활동 시간 → 현재 시간 갱신</li>
-            </ul>
-          </div>
-        </div>
-
-        <button
-          @click="adminResetAllUsers()"
-          class="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-extrabold py-4 rounded-xl btn-press shadow-lg flex items-center justify-center gap-2 transition"
-          :disabled="isLoading"
-          :class="isLoading ? 'opacity-50 cursor-not-allowed' : ''"
-        >
-          <i class="fas fa-exclamation-triangle"></i>
-          <span>전체 유저 초기화 실행</span>
-        </button>
-
-        <div v-if="resetStatus.visible" class="bg-gray-800 border border-gray-700 rounded-xl p-4 animate-pulse">
-          <div class="flex justify-between text-xs text-gray-300 font-extrabold mb-2">
-            <span>진행 중...</span>
-            <span>{{ resetStatus.progress }}%</span>
-          </div>
-          <div class="w-full h-4 bg-gray-700 rounded-full overflow-hidden border border-gray-600 relative">
-            <div class="h-full bg-yellow-500 gauge-fill transition-all duration-300" :style="{ width: resetStatus.progress + '%' }"></div>
-          </div>
-          <div class="text-[11px] text-gray-400 mt-2 text-center">
-            {{ resetStatus.message }} ({{ resetStatus.done }} / {{ resetStatus.total }}명)
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
+  <!-- 유저 화면 -->
   <div v-else class="flex flex-col h-screen bg-[#f0f9ff]">
 
+    <!-- 상단바 -->
     <div class="sticky top-0 bg-white/90 backdrop-blur-sm z-20 border-b border-blue-100 p-3 shadow-sm flex-none">
       <div class="flex justify-between items-center mb-2">
         <div class="flex flex-col">
           <span class="font-bold text-gray-700 text-sm flex items-center">
             <span class="bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-xs mr-1 font-bold">S{{ userData.server }}</span>
             {{ userData.nickname }}님
+
+            <!-- ✅ 모든 유저: 본인 카드 초기화 -->
+            <button
+              @click="resetMyCollection"
+              class="ml-2 text-[11px] bg-gray-900 text-white px-2 py-1 rounded-lg font-extrabold shadow-sm hover:bg-gray-800 transition btn-press"
+              :disabled="isLoading"
+              title="내 카드(81칸)만 0으로 초기화 (오늘 교환횟수 유지)"
+            >
+              초기화
+            </button>
           </span>
           <span class="text-[10px] font-bold mt-1" :class="tradeCount >= 3 ? 'text-red-500' : 'text-green-600'">
             <i class="fas fa-sync-alt mr-1"></i>
@@ -249,7 +122,9 @@
       </div>
     </div>
 
+    <!-- 본문 -->
     <div class="flex-1 overflow-y-auto hide-scroll p-4 pb-20">
+      <!-- ✅ 대시보드(9개 앨범) -->
       <div v-if="currentView === 'dashboard'" class="grid grid-cols-3 gap-x-2 gap-y-6">
         <div v-for="(album, idx) in appConfig.albumNames" :key="idx" @click="openAlbum(idx)" class="flex flex-col items-center cursor-pointer group">
           <div class="w-20 h-20 rounded-full border-4 border-white shadow-lg overflow-hidden relative bg-white group-hover:scale-105 transition duration-200 ring-2 ring-gray-100">
@@ -269,6 +144,7 @@
         </div>
       </div>
 
+      <!-- ✅ 세부 앨범 -->
       <div v-if="currentView === 'detail'">
         <div class="flex justify-between items-center mb-4 bg-white p-2 rounded-xl shadow-sm border border-blue-100">
           <button @click="prevAlbum" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 btn-press text-gray-600"><i class="fas fa-chevron-left"></i></button>
@@ -307,8 +183,16 @@
         </div>
       </div>
     </div>
+
+    <!-- ✅ 67섭 시소만 + dashboard에서만: 앨범설정 플로팅 버튼 -->
+    <div v-if="canEditAlbumConfig && currentView === 'dashboard'" class="fab-wrap" aria-label="앨범 설정 플로팅 버튼">
+      <button @click="showAdminSettingsPopup = true" class="fab-btn bg-indigo-600 hover:bg-indigo-700 text-white btn-press" title="앨범 설정">
+        <i class="fas fa-cog text-xl"></i>
+      </button>
+    </div>
   </div>
 
+  <!-- 멤버 리스트 팝업 -->
   <div v-if="showUserListPopup" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showUserListPopup = false">
     <div class="bg-white rounded-2xl w-full max-w-sm p-5 relative max-h-[86vh] overflow-y-auto shadow-2xl hide-scroll">
       <button @click="showUserListPopup = false" class="absolute top-4 right-4 text-gray-300 hover:text-gray-500"><i class="fas fa-times"></i></button>
@@ -366,6 +250,7 @@
     </div>
   </div>
 
+  <!-- 전체 비교 팝업 -->
   <div v-if="showComparePopup" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showComparePopup = false">
     <div class="bg-white rounded-2xl w-full max-w-sm p-5 relative max-h-[85vh] overflow-y-auto shadow-2xl hide-scroll">
       <button @click="showComparePopup = false" class="absolute top-3 right-3 text-gray-300 hover:text-gray-500"><i class="fas fa-times"></i></button>
@@ -436,6 +321,7 @@
     </div>
   </div>
 
+  <!-- 보유자 찾기 팝업 -->
   <div v-if="showPopup" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showPopup = false">
     <div class="bg-white rounded-2xl w-full max-w-sm p-6 relative shadow-2xl">
       <button @click="showPopup = false" class="absolute top-4 right-4 text-gray-300 hover:text-gray-500"><i class="fas fa-times"></i></button>
@@ -467,6 +353,7 @@
     </div>
   </div>
 
+  <!-- 구해요 팝업 -->
   <div v-if="showNeedsPopup" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showNeedsPopup = false">
     <div class="bg-white rounded-2xl w-full max-w-sm p-5 relative max-h-[85vh] overflow-y-auto shadow-2xl hide-scroll">
       <button @click="showNeedsPopup = false" class="absolute top-4 right-4 text-gray-300 hover:text-gray-500"><i class="fas fa-times"></i></button>
@@ -504,11 +391,17 @@
     </div>
   </div>
 
+  <!-- ✅ 앨범 설정 팝업 (67섭 시소 전용, 대시보드에서만 접근 가능) -->
   <div v-if="showAdminSettingsPopup" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" @click.self="showAdminSettingsPopup = false">
     <div class="bg-white rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto hide-scroll shadow-2xl">
       <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-extrabold text-gray-800">⚙️ 이벤트 설정</h2>
+        <h2 class="text-lg font-extrabold text-gray-800">⚙️ 앨범 설정</h2>
         <button @click="showAdminSettingsPopup = false" class="text-gray-400 hover:text-gray-700"><i class="fas fa-times text-xl"></i></button>
+      </div>
+
+      <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4 text-xs text-yellow-800 leading-snug">
+        <b>※ 67섭 시소 전용</b> 설정 화면입니다.<br>
+        앨범 이름/커버 이미지 주소를 수정할 수 있어요.
       </div>
 
       <div class="space-y-4">
@@ -528,10 +421,11 @@
     </div>
   </div>
 
+  <!-- 도움말 -->
   <div v-if="showHelpPopup" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showHelpPopup = false">
     <div class="bg-white rounded-2xl w-full max-w-sm p-6 relative shadow-2xl">
       <button @click="showHelpPopup = false" class="absolute top-4 right-4 text-gray-300 hover:text-gray-500"><i class="fas fa-times text-xl"></i></button>
-      
+
       <h3 class="text-lg font-extrabold text-gray-800 mb-4 text-center">💡 사용 가이드</h3>
 
       <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-6 text-center">
@@ -585,7 +479,6 @@
     appId: "1:936201723618:web:e4ec53040d668f023988bb",
     measurementId: "G-CEENHZG8HZ"
   };
-  const ADMIN_PASSWORD = "1299";
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
@@ -610,19 +503,13 @@
       const showHelpPopup = ref(false);
       const showNeedsPopup = ref(false);
 
+      // ✅ album settings popup (67섭 시소 전용)
+      const showAdminSettingsPopup = ref(false);
+
       // needs
       const needsKeyword = ref('');
       const needsLoading = ref(false);
       const spareOwnerCounts = ref(Array(81).fill(0));
-
-      // admin
-      const showAdminSettingsPopup = ref(false);
-      const adminTab = ref('transfer');
-      const adminUserList = ref([]);
-      const adminZeroUsers = ref([]);
-      const adminTargetUserId = ref('');
-      const adminMatchList = ref([]);
-      const resetStatus = ref({ visible: false, total: 0, done: 0, progress: 0, message: '' });
 
       // lists
       const exchangeList = ref([]);
@@ -639,7 +526,11 @@
         albumCovers: Array(9).fill("")
       });
 
-      const isAdmin = computed(() => userData.value && userData.value.role === 'admin');
+      // ✅ 67섭 시소만 앨범설정 가능
+      const canEditAlbumConfig = computed(() => {
+        if (!userData.value) return false;
+        return Number(userData.value.server) === 67 && String(userData.value.nickname || '').trim() === '시소';
+      });
 
       const safeNick = (v) => (v || '').toString().trim();
       const safeServer = (v) => Number(v || 0);
@@ -691,7 +582,7 @@
 
       // favorites
       const favKey = computed(() => {
-        if (!userData.value || isAdmin.value) return 'oq_fav_guest';
+        if (!userData.value) return 'oq_fav_guest';
         return `oq_fav_S${userData.value.server}_${userData.value.nickname}`;
       });
       const loadFavSet = () => {
@@ -712,7 +603,7 @@
       };
 
       const checkAndResetDailyLimit = async () => {
-        if (!userData.value || isAdmin.value) return;
+        if (!userData.value) return;
         const today = getGameDate();
         if (userData.value.dailyExchangeDate !== today) {
           userData.value.dailyExchangeCount = 0;
@@ -726,7 +617,7 @@
       };
 
       const updateLastActive = async () => {
-        if (!userData.value || isAdmin.value) return;
+        if (!userData.value) return;
         const docId = `S${userData.value.server}_${userData.value.nickname}`;
         try { await db.collection('users').doc(docId).update({ lastActive: firebase.firestore.FieldValue.serverTimestamp() }); } catch(e) {}
       };
@@ -743,6 +634,7 @@
       };
 
       const saveAppConfig = async () => {
+        if (!canEditAlbumConfig.value) { alert("권한이 없어요!"); return; }
         if (!confirm("저장할까요?")) return;
         try {
           await db.collection('config').doc('service_info').set(appConfig.value);
@@ -753,15 +645,52 @@
         }
       };
 
+      // ✅ 모든 유저: 내 카드만 초기화 (교환횟수는 유지!)
+      const resetMyCollection = async () => {
+        if (!userData.value) return;
+
+        const ok = confirm("내 카드(81칸)를 전부 0으로 초기화할까요?\n\n※ 오늘 교환 횟수는 초기화되지 않습니다.");
+        if (!ok) return;
+
+        const confirmText = prompt("실수를 방지하기 위해 아래 문구를 똑같이 입력해주세요.\n\n내카드초기화");
+        if (confirmText !== "내카드초기화") {
+          alert("문구가 일치하지 않아 취소되었습니다.");
+          return;
+        }
+
+        isLoading.value = true;
+        try {
+          const docId = `S${userData.value.server}_${userData.value.nickname}`;
+          const zeroCollection = Array(81).fill(0);
+          const now = firebase.firestore.FieldValue.serverTimestamp();
+
+          await db.collection('users').doc(docId).update({
+            collection: zeroCollection,
+            lastUpdated: now
+            // dailyExchangeCount / dailyExchangeDate는 건드리지 않음
+          });
+
+          userData.value.collection = zeroCollection;
+          localStorage.setItem('oq_user_v4', JSON.stringify(userData.value));
+
+          alert("✅ 내 카드 초기화 완료!");
+          currentView.value = 'dashboard';
+        } catch (e) {
+          alert("초기화 실패: " + (e.message || e));
+        } finally {
+          isLoading.value = false;
+        }
+      };
+
       const refreshSpareOwnerCounts = async () => {
-        if (!userData.value || isAdmin.value) return;
+        if (!userData.value) return;
         needsLoading.value = true;
         try {
           const counts = Array(81).fill(0);
           const snap = await db.collection('users').get();
           snap.forEach(doc => {
             const u = doc.data();
-            if (!u || u.role === 'admin') return;
+            if (!u) return;
             if (u.server === userData.value.server && u.nickname === userData.value.nickname) return;
 
             const col = Array.isArray(u.collection) ? u.collection : [];
@@ -947,7 +876,7 @@
 
           snap.forEach(doc => {
             const u = doc.data();
-            if (!u || u.role === 'admin') return;
+            if (!u) return;
             if (u.server === userData.value.server && u.nickname === userData.value.nickname) return;
 
             if (Array.isArray(u.collection) && (u.collection[absIdx] || 0) > 1) {
@@ -1064,7 +993,7 @@
           const users = [];
           snapshot.forEach(doc => {
             const u = doc.data();
-            if (!u || u.role === 'admin') return;
+            if (!u) return;
             if (u.server === userData.value.server && u.nickname === userData.value.nickname) return;
 
             const total = (u.collection || []).reduce((a, b) => a + (b>0?1:0), 0);
@@ -1088,179 +1017,6 @@
         }
       };
 
-      const fetchAdminData = async () => {
-        if (!isAdmin.value) return;
-        isLoading.value = true;
-        adminUserList.value = [];
-        adminZeroUsers.value = [];
-        adminMatchList.value = [];
-        adminTargetUserId.value = '';
-
-        try {
-          const snapshot = await db.collection('users').get();
-          const all = [];
-          snapshot.forEach(doc => {
-            const u = doc.data();
-            if (!u || u.role === 'admin') return;
-
-            const col = Array.isArray(u.collection) ? u.collection : Array(81).fill(0);
-            const total = col.reduce((a,b)=>a+(b>0?1:0),0);
-
-            all.push({
-              id: doc.id,
-              server: u.server,
-              nickname: u.nickname,
-              collection: col,
-              totalCount: total,
-              lastActive: u.lastActive
-            });
-          });
-
-          adminUserList.value = [...all].sort((a,b)=> (a.nickname||'').localeCompare((b.nickname||'')));
-          adminZeroUsers.value = all.filter(x => x.totalCount === 0)
-            .sort((a,b)=> (tsToDate(b.lastActive)?.getTime()||0) - (tsToDate(a.lastActive)?.getTime()||0));
-        } catch(e) {
-          alert("관리자 데이터 로드 실패: " + (e.message || e));
-        } finally {
-          isLoading.value = false;
-        }
-      };
-
-      const calculateAdminMatches = () => {
-        if (!adminTargetUserId.value) return;
-        const targetUser = adminUserList.value.find(u => u.id === adminTargetUserId.value);
-        if (!targetUser) return;
-
-        const matches = [];
-        adminUserList.value.forEach(donor => {
-          if (donor.id === targetUser.id) return;
-
-          const giveable = [];
-          for (let i=0; i<81; i++) {
-            if ((donor.collection[i] || 0) > 1 && (targetUser.collection[i] || 0) === 0) {
-              giveable.push({ index: i, name: cardNameByIndex(i) });
-            }
-          }
-          if (giveable.length > 0) matches.push({ user: donor, giveable });
-        });
-
-        matches.sort((a,b)=> b.giveable.length - a.giveable.length);
-        adminMatchList.value = matches;
-      };
-
-      const executeAdminTransfer = async (match) => {
-        if (!confirm(`S${match.user.server} ${match.user.nickname}님의 카드 ${match.giveable.length}장을 가져오시겠습니까?`)) return;
-        isLoading.value = true;
-        try {
-          const targetUserRef = db.collection('users').doc(adminTargetUserId.value);
-          const donorUserRef = db.collection('users').doc(match.user.id);
-
-          await db.runTransaction(async (t) => {
-            const targetDoc = await t.get(targetUserRef);
-            const donorDoc = await t.get(donorUserRef);
-            if (!targetDoc.exists || !donorDoc.exists) throw "유저 정보 없음";
-
-            const targetCol = Array.isArray(targetDoc.data().collection) ? targetDoc.data().collection : Array(81).fill(0);
-            const donorCol = Array.isArray(donorDoc.data().collection) ? donorDoc.data().collection : Array(81).fill(0);
-
-            match.giveable.forEach(card => {
-              const idx = card.index;
-              if ((donorCol[idx] || 0) > 1) { donorCol[idx]--; targetCol[idx]++; }
-            });
-
-            const now = firebase.firestore.FieldValue.serverTimestamp();
-            t.update(targetUserRef, { collection: targetCol, lastUpdated: now });
-            t.update(donorUserRef, { collection: donorCol, lastUpdated: now });
-          });
-
-          alert("이동 완료! ⚡");
-          await fetchAdminData();
-          adminTargetUserId.value = '';
-        } catch(e) {
-          alert("오류 발생: " + (e.message || e));
-        } finally {
-          isLoading.value = false;
-        }
-      };
-
-      const adminDeleteUser = async (u) => {
-        if (!confirm(`정말 삭제할까요?\nS${u.server} ${u.nickname}\n(복구 불가)`)) return;
-        try {
-          await db.collection('users').doc(u.id).delete();
-          alert("삭제 완료 ✅");
-          await fetchAdminData();
-        } catch(e) {
-          alert("삭제 실패: " + (e.message || e));
-        }
-      };
-
-      const adminResetAllUsers = async () => {
-        if (!isAdmin.value) return;
-        if (!confirm("⚠️ [경고] 정말로 시즌을 초기화하시겠습니까?\n\n모든 유저의 '카드 보유량'이 0으로 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.")) return;
-
-        const confirmText = prompt("실수를 방지하기 위해 아래 문구를 똑같이 입력해주세요.\n\n초기화");
-        if (confirmText !== "초기화") {
-            alert("문구가 일치하지 않아 취소되었습니다.");
-            return;
-        }
-
-        isLoading.value = true;
-        resetStatus.value = { visible: true, total: 0, done: 0, progress: 0, message: '유저 목록을 불러오는 중...' };
-
-        try {
-            const today = getGameDate();
-            const zeroCollection = Array(81).fill(0);
-            const now = firebase.firestore.FieldValue.serverTimestamp();
-
-            const snapshot = await db.collection('users').get();
-            const targetDocs = [];
-            snapshot.forEach(doc => {
-                const u = doc.data();
-                if (u.role !== 'admin') {
-                    targetDocs.push(doc.ref);
-                }
-            });
-
-            resetStatus.value.total = targetDocs.length;
-            resetStatus.value.message = '데이터 초기화 기록 중...';
-
-            const chunkSize = 400;
-            let processedCount = 0;
-
-            for (let i = 0; i < targetDocs.length; i += chunkSize) {
-                const batch = db.batch();
-                const chunk = targetDocs.slice(i, i + chunkSize);
-
-                chunk.forEach(docRef => {
-                    batch.update(docRef, {
-                        collection: zeroCollection,
-                        dailyExchangeCount: 0,
-                        dailyExchangeDate: today,
-                        lastUpdated: now
-                    });
-                });
-
-                await batch.commit();
-                processedCount += chunk.length;
-                resetStatus.value.done = processedCount;
-                resetStatus.value.progress = Math.round((processedCount / targetDocs.length) * 100);
-            }
-
-            resetStatus.value.message = '완료되었습니다!';
-            resetStatus.value.progress = 100;
-            
-            alert(`✅ 시즌 초기화 완료!\n총 ${processedCount}명의 유저 데이터가 리셋되었습니다.`);
-            await fetchAdminData();
-
-        } catch (e) {
-            console.error(e);
-            alert("초기화 중 오류가 발생했습니다:\n" + (e.message || e));
-        } finally {
-            isLoading.value = false;
-            setTimeout(() => { resetStatus.value.visible = false; }, 2000);
-        }
-      };
-
       const handleLogin = async () => {
         if (isLoading.value) return;
 
@@ -1272,17 +1028,11 @@
         if (!/^\d{4}$/.test(password)) { alert('비밀번호는 숫자 4자리!'); return; }
         if (/\s/.test(nickname)) { alert("닉네임에 공백은 안돼요!"); return; }
 
-        if (nickname === '관리자') {
-          if (password !== ADMIN_PASSWORD) { alert("비번 틀림"); return; }
-          await processLogin('MASTER_ADMIN', { nickname: '관리자', server: 0, password: ADMIN_PASSWORD, role: 'admin' });
-          return;
-        }
-
         server = safeServer(server);
         if (!server) { alert('서버 입력!'); return; }
 
         const docId = `S${server}_${nickname}`;
-        await processLogin(docId, { nickname, server, password, role: 'user' });
+        await processLogin(docId, { nickname, server, password });
       };
 
       const processLogin = async (docId, userInfo) => {
@@ -1318,12 +1068,8 @@
 
           isLoggedIn.value = true;
 
-          if (finalData.role !== 'admin') {
-            await checkAndResetDailyLimit();
-            updateLastActive();
-          } else {
-            await fetchAdminData();
-          }
+          await checkAndResetDailyLimit();
+          updateLastActive();
         } catch(e) {
           alert('오류: ' + (e.message || e));
         } finally {
@@ -1340,12 +1086,8 @@
           favSet.value = loadFavSet();
           isLoggedIn.value = true;
 
-          if (userData.value.role !== 'admin') {
-            await checkAndResetDailyLimit();
-            updateLastActive();
-          } else {
-            await fetchAdminData();
-          }
+          await checkAndResetDailyLimit();
+          updateLastActive();
         } catch(e) {}
       };
       checkLogin();
@@ -1360,11 +1102,12 @@
         showUserListPopup.value = false;
         showComparePopup.value = false;
         showNeedsPopup.value = false;
+        showAdminSettingsPopup.value = false;
       };
 
       return {
         isLoggedIn, isLoading, loginForm, handleLogin, logout,
-        userData, isAdmin,
+        userData,
         currentView, currentAlbumIdx, currentAlbumCards,
         openAlbum, prevAlbum, nextAlbum,
         updateCount, onCardTap, onCardHoldStart, onCardHoldEnd,
@@ -1378,14 +1121,14 @@
         openCompare, compareTarget, compareResult,
         copyTradeText, executeTrade,
         getActiveText, getActiveColor,
-        // admin
-        adminTab, showAdminSettingsPopup, saveAppConfig,
-        fetchAdminData, adminUserList, adminZeroUsers,
-        adminTargetUserId, adminMatchList, calculateAdminMatches, executeAdminTransfer,
-        adminDeleteUser,
+
+        // ✅ 앨범 설정(67섭 시소만)
+        canEditAlbumConfig,
+        showAdminSettingsPopup, saveAppConfig,
         appConfig,
-        resetStatus,
-        adminResetAllUsers
+
+        // ✅ 내 카드 초기화(모든 유저)
+        resetMyCollection
       };
     }
   }).mount('#app');
