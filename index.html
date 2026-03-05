@@ -26,12 +26,19 @@
     .tab-on { background: #111827; color: white; border-color: #111827; }
     .tab-off { background: #f3f4f6; color: #374151; }
 
+    /* floating button */
     .fab {
       position: fixed;
       right: 18px;
       bottom: 18px;
       z-index: 40;
       box-shadow: 0 14px 35px rgba(0,0,0,0.18);
+    }
+
+    /* checkbox look */
+    .cb {
+      width: 16px; height: 16px;
+      accent-color: #111827;
     }
   </style>
 </head>
@@ -61,7 +68,7 @@
     <p class="text-xs text-gray-400 text-center mt-6">서버/닉네임 입력 시 자동 가입됩니다.</p>
   </div>
 
-  <!-- 메인 -->
+  <!-- 일반 유저 화면 -->
   <div v-else class="flex flex-col h-screen bg-[#f0f9ff]">
 
     <!-- 상단바 -->
@@ -72,6 +79,7 @@
             <span class="bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-xs font-bold">S{{ userData.server }}</span>
             <span>{{ userData.nickname }}님</span>
 
+            <!-- ✅ 본인 카드 초기화 버튼 (모든 유저) -->
             <button @click="resetMyCards"
                     class="text-[10px] bg-gray-100 text-gray-700 px-2 py-1 rounded-lg font-extrabold hover:bg-gray-200 btn-press border border-gray-200">
               🧹 초기화
@@ -86,7 +94,7 @@
 
         <div class="flex gap-2 items-center">
           <button @click="openHelp" class="text-gray-400 hover:text-blue-500"><i class="fas fa-question-circle text-lg"></i></button>
-          <button @click="openNeedsPopup" class="text-xs bg-pink-500 text-white px-2.5 py-1.5 rounded-lg font-extrabold shadow-sm hover:bg-pink-600 transition btn-press">🧾 구해요</button>
+          <button @click="openNeedsPopup" class="text-xs bg-pink-500 text-white px-2.5 py-1.5 rounded-lg font-extrabold shadow-sm hover:bg-pink-600 transition btn-press">🧾 구함</button>
           <button @click="fetchUsersAndShowList" class="text-xs bg-blue-500 text-white px-2.5 py-1.5 rounded-lg font-extrabold shadow-sm hover:bg-blue-600 transition btn-press">👥 멤버</button>
           <button @click="logout" class="text-xs text-gray-400 border border-gray-200 px-2 py-1 rounded hover:bg-gray-50 btn-press">나가기</button>
         </div>
@@ -100,15 +108,16 @@
       </div>
     </div>
 
-    <!-- ✅ 공지(항상 보이게) -->
-    <div v-if="currentView === 'dashboard'" class="px-3 pt-2 flex-none">
+    <!-- ✅ 공지바 (대시보드에서만) -->
+    <div v-if="notice.text && currentView === 'dashboard'" class="px-3 pt-2 flex-none">
       <div class="bg-yellow-50 border border-yellow-200 rounded-2xl shadow-sm overflow-hidden">
-        <button type="button" @click="toggleNotice"
+        <!-- 헤더(한 줄 요약) -->
+        <button @click="toggleNotice"
                 class="w-full px-3 py-2 flex items-center justify-between btn-press">
           <div class="flex items-center gap-2 min-w-0">
             <span class="text-xs font-extrabold text-yellow-700">📢 공지</span>
             <span class="text-xs text-gray-700 truncate">
-              {{ (notice.text || '공지 준비중입니다 🙂').split('\n')[0] }}
+              {{ notice.text.split('\n')[0] }}
             </span>
             <span v-if="notice.updatedAt" class="text-[10px] text-gray-400 flex-none">
               ({{ notice.updatedAt }})
@@ -117,17 +126,19 @@
           <i class="fas" :class="noticeOpen ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
         </button>
 
+        <!-- 본문(펼침) -->
         <div v-if="noticeOpen" class="px-3 pb-3">
           <div class="text-xs text-gray-800 whitespace-pre-line leading-relaxed">
-            {{ notice.text || defaultNoticeText }}
+            {{ notice.text }}
           </div>
 
           <div class="mt-2 flex items-center justify-between">
-            <button type="button" @click="loadNotice"
+            <button @click="loadNotice"
                     class="text-[10px] bg-white border border-yellow-200 text-yellow-700 px-2 py-1 rounded-lg font-extrabold btn-press">
               🔄 새로고침
             </button>
 
+            <!-- ✅ 시소만: 모바일에서도 GitHub 편집으로 바로 -->
             <a v-if="canEditAlbums"
                href="https://github.com/oqsiso/oq-album/edit/main/notice.json"
                target="_blank"
@@ -142,7 +153,7 @@
     <!-- 본문 -->
     <div class="flex-1 overflow-y-auto hide-scroll p-4 pb-24">
 
-      <!-- 대시보드 -->
+      <!-- 대시보드(앨범 9개) -->
       <div v-if="currentView === 'dashboard'" class="grid grid-cols-3 gap-x-2 gap-y-6">
         <div v-for="(album, idx) in appConfig.albumNames" :key="idx" @click="openAlbum(idx)" class="flex flex-col items-center cursor-pointer group">
           <div class="w-20 h-20 rounded-full border-4 border-white shadow-lg overflow-hidden relative bg-white group-hover:scale-105 transition duration-200 ring-2 ring-gray-100">
@@ -162,7 +173,7 @@
         </div>
       </div>
 
-      <!-- 상세 -->
+      <!-- 상세(앨범 1개) -->
       <div v-if="currentView === 'detail'">
         <div class="flex justify-between items-center mb-4 bg-white p-2 rounded-xl shadow-sm border border-blue-100">
           <button @click="prevAlbum" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 btn-press text-gray-600"><i class="fas fa-chevron-left"></i></button>
@@ -181,7 +192,7 @@
               </div>
 
               <div v-if="count === 0" class="absolute inset-0 bg-white/90 flex flex-col items-center justify-center text-red-500 font-bold z-10 group-hover:bg-white/70 transition">
-                <i class="fas fa-search text-lg mb-1"></i><span class="text-[9px]">구해요</span>
+                <i class="fas fa-search text-lg mb-1"></i><span class="text-[9px]">구함</span>
                 <span class="text-[9px] mt-1 text-gray-400 font-extrabold">(탭하면 보유자)</span>
               </div>
             </div>
@@ -202,12 +213,13 @@
       </div>
     </div>
 
-    <!-- 67섭 시소: 앨범 설정 -->
+    <!-- ✅ 67섭 시소만: 앨범 설정 버튼 -->
     <button v-if="canEditAlbums && currentView === 'dashboard'"
             @click="showAlbumSettingsPopup = true"
             class="fab bg-gray-900 text-white w-14 h-14 rounded-full flex items-center justify-center btn-press">
       <i class="fas fa-gear text-xl"></i>
     </button>
+
   </div>
 
   <!-- 멤버 리스트 팝업 -->
@@ -222,8 +234,8 @@
       <div class="grid grid-cols-5 gap-2 mb-3">
         <button class="tab-btn" :class="memberFilter==='all'?'tab-on':'tab-off'" @click="memberFilter='all'">전체</button>
         <button class="tab-btn" :class="memberFilter==='winwin'?'tab-on':'tab-off'" @click="memberFilter='winwin'">윈윈</button>
-        <button class="tab-btn" :class="memberFilter==='receive'?'tab-on':'tab-off'" @click="memberFilter='receive'">받기</button>
-        <button class="tab-btn" :class="memberFilter==='give'?'tab-on':'tab-off'" @click="memberFilter='give'">주기</button>
+        <button class="tab-btn" :class="memberFilter==='gift'?'tab-on':'tab-off'" @click="memberFilter='gift'">선물</button>
+        <button class="tab-btn" :class="memberFilter==='need'?'tab-on':'tab-off'" @click="memberFilter='need'">구함</button>
         <button class="tab-btn" :class="memberFilter==='fav'?'tab-on':'tab-off'" @click="memberFilter='fav'">⭐</button>
       </div>
 
@@ -246,7 +258,6 @@
                   {{ user.nickname }}
                 </span>
                 <i v-if="user.totalCount >= 81" class="fas fa-trophy text-yellow-500 text-xs"></i>
-
                 <span v-if="user.isTradeClosed" class="text-[10px] bg-red-100 text-red-600 font-extrabold px-1.5 py-0.5 rounded-full ml-1">
                   마감
                 </span>
@@ -256,8 +267,8 @@
                 <span class="text-[9px] text-gray-400"><i class="fas fa-history mr-0.5"></i>{{ getActiveText(user.lastActive) }}</span>
                 <span class="text-[10px] px-1.5 rounded-full" :class="user.totalCount >= 40 ? 'bg-pink-100 text-pink-600 font-extrabold' : 'bg-gray-100 text-gray-500'">{{ user.totalCount || 0 }}/81</span>
                 <span v-if="user.match.winwin" class="text-[10px] bg-red-100 text-red-600 font-extrabold px-1.5 py-0.5 rounded-full">윈윈</span>
-                <span v-else-if="user.match.receive" class="text-[10px] bg-green-100 text-green-700 font-extrabold px-1.5 py-0.5 rounded-full">받기</span>
-                <span v-else-if="user.match.give" class="text-[10px] bg-blue-100 text-blue-700 font-extrabold px-1.5 py-0.5 rounded-full">주기</span>
+                <span v-else-if="user.match.need" class="text-[10px] bg-green-100 text-green-700 font-extrabold px-1.5 py-0.5 rounded-full">구함</span>
+                <span v-else-if="user.match.gift" class="text-[10px] bg-blue-100 text-blue-700 font-extrabold px-1.5 py-0.5 rounded-full">선물</span>
               </div>
             </div>
           </div>
@@ -274,17 +285,19 @@
     </div>
   </div>
 
-  <!-- 비교 팝업 -->
+  <!-- 비교 팝업 (요약: 윈윈/선물(기부)/구함) -->
   <div v-if="showComparePopup" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showComparePopup = false">
-    <div class="bg-white rounded-2xl w-full max-w-sm p-5 relative max-h-[85vh] overflow-y-auto shadow-2xl hide-scroll">
+    <div class="bg-white rounded-2xl w-full max-w-sm p-5 relative max-h-[85vh] overflow-y-auto shadow-2xl hide-scroll" @click.stop>
       <button @click="showComparePopup = false" class="absolute top-3 right-3 text-gray-300 hover:text-gray-500"><i class="fas fa-times"></i></button>
 
-      <div class="text-center mb-5 mt-2">
+      <div class="text-center mb-4 mt-2">
         <div class="text-xs text-gray-400 mb-1">나 vs 상대방</div>
-        <h3 class="text-lg font-extrabold text-gray-800 flex justify-center items-center gap-2">
-          S{{ compareTarget.server }} {{ compareTarget.nickname }}
+        <div class="flex items-center justify-center gap-2">
+          <h3 class="text-lg font-extrabold text-gray-800">
+            S{{ compareTarget.server }} {{ compareTarget.nickname }}
+          </h3>
           <span v-if="compareTarget.isTradeClosed" class="text-[10px] bg-red-100 text-red-600 font-extrabold px-2 py-0.5 rounded-full">오늘 마감</span>
-        </h3>
+        </div>
       </div>
 
       <div v-if="isLoading" class="flex justify-center py-8"><div class="loader"></div></div>
@@ -294,124 +307,147 @@
         <!-- 윈윈 -->
         <div class="bg-red-50 p-3 rounded-xl border border-red-100">
           <div class="flex items-center justify-between">
-            <div>
-              <h4 class="font-extrabold text-red-600 text-xs flex items-center">
-                <i class="fas fa-heart mr-1"></i> 🤝 윈윈 교환
-              </h4>
+            <div class="flex flex-col">
+              <div class="text-xs font-extrabold text-red-600 flex items-center gap-1">
+                <i class="fas fa-heart"></i> 윈윈 교환
+              </div>
               <div class="text-[11px] text-gray-600 mt-1">
-                내가 줄 수 있음 <b class="text-red-600">{{ compareResult.winGive.length }}</b>개 /
-                내가 받을 수 있음 <b class="text-red-600">{{ compareResult.winReceive.length }}</b>개
+                내가 줄 수 있음 <b class="text-red-600">{{ compareResult.giveOnly.length }}</b>개 /
+                내가 받을 수 있음 <b class="text-red-600">{{ compareResult.receiveOnly.length }}</b>개
               </div>
             </div>
-
-            <button @click="openDealBuilder('winwin')"
-                    class="text-[10px] bg-red-500 text-white px-2.5 py-1.5 rounded-lg font-extrabold btn-press">
-              거래 만들기
-            </button>
+            <div class="flex flex-col gap-2 items-end">
+              <button @click="openDealBuilderPreset('winwin')"
+                      class="text-[10px] bg-red-500 text-white px-2.5 py-1.5 rounded-lg font-extrabold btn-press"
+                      :class="(compareResult.giveOnly.length===0 || compareResult.receiveOnly.length===0) ? 'opacity-50 cursor-not-allowed' : ''"
+                      :disabled="compareResult.giveOnly.length===0 || compareResult.receiveOnly.length===0">
+                거래 만들기
+              </button>
+              <button @click="toggleCompareFold('winwin')" class="text-[10px] text-red-600 font-extrabold btn-press">
+                {{ compareFold.winwin ? '요약 보기 ▲' : '요약 보기 ▼' }}
+              </button>
+            </div>
           </div>
 
-          <button v-if="(compareResult.winGive.length + compareResult.winReceive.length) > 0"
-                  @click="compareWinOpen=!compareWinOpen"
-                  class="mt-2 w-full text-[10px] bg-white/70 border border-red-100 text-red-600 px-2 py-1 rounded-lg font-extrabold btn-press flex items-center justify-between">
-            <span>가능 카드 요약 보기</span>
-            <i class="fas" :class="compareWinOpen ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-          </button>
-
-          <div v-if="compareWinOpen" class="mt-2 space-y-2">
-            <div class="bg-white rounded-lg p-2 border border-red-100">
-              <div class="text-[10px] font-extrabold text-red-600 mb-1">내가 줄 카드(상대 0)</div>
-              <div class="flex flex-wrap gap-1">
-                <span v-for="c in compareResult.winGive.slice(0,10)" :key="'wg'+c.index"
-                      class="text-[9px] bg-red-50 border border-red-100 px-1.5 py-0.5 rounded text-gray-700">
-                  {{ c.name }}
-                </span>
-              </div>
-              <div v-if="compareResult.winGive.length>10" class="text-[9px] text-gray-400 mt-1">+ {{ compareResult.winGive.length-10 }}개 더…</div>
-            </div>
-
-            <div class="bg-white rounded-lg p-2 border border-red-100">
-              <div class="text-[10px] font-extrabold text-red-600 mb-1">내가 받을 카드(내 0)</div>
-              <div class="flex flex-wrap gap-1">
-                <span v-for="c in compareResult.winReceive.slice(0,10)" :key="'wr'+c.index"
-                      class="text-[9px] bg-red-50 border border-red-100 px-1.5 py-0.5 rounded text-gray-700">
-                  {{ c.name }}
-                </span>
-              </div>
-              <div v-if="compareResult.winReceive.length>10" class="text-[9px] text-gray-400 mt-1">+ {{ compareResult.winReceive.length-10 }}개 더…</div>
-            </div>
+          <div v-if="compareFold.winwin" class="mt-2 text-[11px] text-gray-700">
+            ✅ <b>체크 1 + 체크 2</b>가 켜진 상태 = 윈윈 교환<br>
+            (줄 카드: 상대 0만 / 받을 카드: 내 0만)
           </div>
         </div>
 
-        <!-- 나눔 -->
+        <!-- 선물/기부 -->
         <div class="bg-blue-50 p-3 rounded-xl border border-blue-100">
           <div class="flex items-center justify-between">
-            <div>
-              <h4 class="font-extrabold text-blue-600 text-xs flex items-center">
-                <i class="fas fa-gift mr-1"></i> 🎁 나눔 교환
-              </h4>
+            <div class="flex flex-col">
+              <div class="text-xs font-extrabold text-blue-600 flex items-center gap-1">
+                <i class="fas fa-gift"></i> 선물 · 기부
+              </div>
               <div class="text-[11px] text-gray-600 mt-1">
-                내 여유 <b class="text-blue-600">{{ compareResult.mySpareAll.length }}</b>개 /
-                상대 여유 <b class="text-blue-600">{{ compareResult.targetSpareAll.length }}</b>개
+                “상대가 필요한 카드(상대 0)” 위주로 주고<br>
+                “받는 카드는 자유”로 고르는 모드
               </div>
             </div>
-
-            <button @click="openDealBuilder('share')"
-                    class="text-[10px] bg-blue-500 text-white px-2.5 py-1.5 rounded-lg font-extrabold btn-press">
-              거래 만들기
-            </button>
-          </div>
-
-          <button v-if="(compareResult.mySpareAll.length + compareResult.targetSpareAll.length) > 0"
-                  @click="compareShareOpen=!compareShareOpen"
-                  class="mt-2 w-full text-[10px] bg-white/70 border border-blue-100 text-blue-700 px-2 py-1 rounded-lg font-extrabold btn-press flex items-center justify-between">
-            <span>여유 카드 요약 보기</span>
-            <i class="fas" :class="compareShareOpen ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-          </button>
-
-          <div v-if="compareShareOpen" class="mt-2 space-y-2">
-            <div class="bg-white rounded-lg p-2 border border-blue-100">
-              <div class="text-[10px] font-extrabold text-blue-600 mb-1">내 여유(2장↑)</div>
-              <div class="flex flex-wrap gap-1">
-                <span v-for="c in compareResult.mySpareAll.slice(0,10)" :key="'ms'+c.index"
-                      class="text-[9px] bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded text-gray-700">
-                  {{ c.name }}
-                </span>
-              </div>
-              <div v-if="compareResult.mySpareAll.length>10" class="text-[9px] text-gray-400 mt-1">+ {{ compareResult.mySpareAll.length-10 }}개 더…</div>
-            </div>
-
-            <div class="bg-white rounded-lg p-2 border border-blue-100">
-              <div class="text-[10px] font-extrabold text-blue-600 mb-1">상대 여유(2장↑)</div>
-              <div class="flex flex-wrap gap-1">
-                <span v-for="c in compareResult.targetSpareAll.slice(0,10)" :key="'ts'+c.index"
-                      class="text-[9px] bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded text-gray-700">
-                  {{ c.name }}
-                </span>
-              </div>
-              <div v-if="compareResult.targetSpareAll.length>10" class="text-[9px] text-gray-400 mt-1">+ {{ compareResult.targetSpareAll.length-10 }}개 더…</div>
+            <div class="flex flex-col gap-2 items-end">
+              <button @click="openDealBuilderPreset('gift')"
+                      class="text-[10px] bg-blue-500 text-white px-2.5 py-1.5 rounded-lg font-extrabold btn-press"
+                      :class="(compareResult.giveOnly.length===0 || compareResult.targetSpareAll.length===0) ? 'opacity-50 cursor-not-allowed' : ''"
+                      :disabled="compareResult.giveOnly.length===0 || compareResult.targetSpareAll.length===0">
+                거래 만들기
+              </button>
+              <button @click="toggleCompareFold('gift')" class="text-[10px] text-blue-700 font-extrabold btn-press">
+                {{ compareFold.gift ? '요약 보기 ▲' : '요약 보기 ▼' }}
+              </button>
             </div>
           </div>
 
-          <div class="text-[10px] text-gray-500 mt-2">
-            ✅ 나눔 교환도 <b>“줄 1장 + 받을 1장”</b> 선택해서 기록해요. (상대 카드도 줄어듦)
+          <div v-if="compareFold.gift" class="mt-2 text-[11px] text-gray-700">
+            ✅ <b>체크 1만</b> 켜짐 = 선물/기부<br>
+            (줄 카드: 상대 0만 / 받을 카드: 자유)
           </div>
         </div>
 
+        <!-- 구함 -->
+        <div class="bg-green-50 p-3 rounded-xl border border-green-100">
+          <div class="flex items-center justify-between">
+            <div class="flex flex-col">
+              <div class="text-xs font-extrabold text-green-700 flex items-center gap-1">
+                <i class="fas fa-hand-holding"></i> 구함
+              </div>
+              <div class="text-[11px] text-gray-600 mt-1">
+                “내가 필요한 카드(내 0)” 위주로 받고<br>
+                “주는 카드는 자유”로 고르는 모드
+              </div>
+            </div>
+            <div class="flex flex-col gap-2 items-end">
+              <button @click="openDealBuilderPreset('need')"
+                      class="text-[10px] bg-green-600 text-white px-2.5 py-1.5 rounded-lg font-extrabold btn-press"
+                      :class="(compareResult.receiveOnly.length===0 || compareResult.mySpareAll.length===0) ? 'opacity-50 cursor-not-allowed' : ''"
+                      :disabled="compareResult.receiveOnly.length===0 || compareResult.mySpareAll.length===0">
+                거래 만들기
+              </button>
+              <button @click="toggleCompareFold('need')" class="text-[10px] text-green-700 font-extrabold btn-press">
+                {{ compareFold.need ? '요약 보기 ▲' : '요약 보기 ▼' }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="compareFold.need" class="mt-2 text-[11px] text-gray-700">
+            ✅ <b>체크 2만</b> 켜짐 = 구함<br>
+            (줄 카드: 자유 / 받을 카드: 내 0만)
+          </div>
+        </div>
+
+        <div class="text-[10px] text-gray-400 text-center">
+          ※ “거래 만들기”에서 체크 상태로 3가지가 결정돼요.
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- ✅ 거래 만들기 (윈윈/나눔) -->
+  <!-- ✅ 거래 만들기 팝업 (체크 1/2로 윈윈/선물/구함 결정) -->
   <div v-if="showDealBuilder" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="closeDealBuilder">
-    <div class="bg-white rounded-2xl w-full max-w-sm p-5 relative shadow-2xl">
+    <div class="bg-white rounded-2xl w-full max-w-sm p-5 relative shadow-2xl" @click.stop>
       <button @click="closeDealBuilder" class="absolute top-3 right-3 text-gray-300 hover:text-gray-500"><i class="fas fa-times"></i></button>
 
-      <div class="mb-4">
+      <div class="mb-3">
         <div class="text-xs text-gray-400 mb-1">거래 1건 만들기</div>
         <div class="text-lg font-extrabold text-gray-800 flex items-center gap-2">
-          <span v-if="dealType==='winwin'">🤝 윈윈 교환</span>
-          <span v-else>🎁 나눔 교환</span>
+          <span v-if="dealMode==='winwin'">💞 윈윈 교환</span>
+          <span v-else-if="dealMode==='gift'">🎁 선물 · 기부</span>
+          <span v-else-if="dealMode==='need'">🟢 구함</span>
+          <span v-else class="text-gray-400">거래 조건 선택</span>
           <span class="text-sm font-bold text-gray-500">/ S{{ compareTarget.server }} {{ compareTarget.nickname }}</span>
+        </div>
+      </div>
+
+      <!-- ✅ 체크박스 (사진 느낌: 오른쪽에 설명 붙이기) -->
+      <div class="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-3">
+        <div class="flex items-start justify-between gap-3">
+          <label class="flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" class="cb mt-0.5" v-model="needOnlyGive">
+            <div class="text-xs">
+              <div class="font-extrabold text-gray-800">체크 1</div>
+              <div class="text-[11px] text-gray-600 leading-snug">
+                <b>주는 카드</b>는 <b class="text-gray-800">상대가 0인 카드만</b>
+              </div>
+            </div>
+          </label>
+
+          <label class="flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" class="cb mt-0.5" v-model="needOnlyReceive">
+            <div class="text-xs">
+              <div class="font-extrabold text-gray-800">체크 2</div>
+              <div class="text-[11px] text-gray-600 leading-snug">
+                <b>받는 카드</b>는 <b class="text-gray-800">내가 0인 카드만</b>
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div class="mt-2 text-[11px] text-gray-600 leading-snug">
+          • 체크1+체크2 = <b class="text-red-600">윈윈</b><br>
+          • 체크1만 = <b class="text-blue-600">선물·기부</b><br>
+          • 체크2만 = <b class="text-green-700">구함</b>
         </div>
       </div>
 
@@ -419,69 +455,27 @@
 
         <!-- 내가 줄 카드 -->
         <div class="bg-blue-50 border border-blue-100 rounded-xl p-3">
-          <div class="flex items-center justify-between mb-2">
-            <div class="text-xs font-extrabold text-blue-600">
-              내가 줄 카드 (내 여유분 2장↑)
-            </div>
-
-            <!-- ✅ 캡쳐처럼 오른쪽 체크박스 -->
-            <label v-if="dealType==='share'"
-                   class="flex items-center gap-2 text-[10px] font-extrabold text-blue-700">
-              <input type="checkbox" v-model="shareGiveTargetZeroOnly" class="w-4 h-4">
-              상대 0만
-            </label>
-          </div>
-
+          <div class="text-xs font-extrabold text-blue-600 mb-2">내가 줄 카드 (내 여유분 2장↑)</div>
           <select v-model.number="dealGiveIndex" class="w-full p-3 bg-white border border-blue-200 rounded-lg text-sm focus:outline-none">
             <option :value="null">선택해주세요</option>
-
-            <!-- 윈윈 -->
-            <option v-if="dealType==='winwin'" v-for="c in compareResult.winGive" :key="'dg_w_'+c.index" :value="c.index">
-              {{ c.name }}
-            </option>
-
-            <!-- 나눔 -->
-            <option v-else v-for="c in shareGiveOptions" :key="'dg_s_'+c.index" :value="c.index">
-              {{ c.name }}
-            </option>
+            <option v-for="c in dealGiveList" :key="'dg_'+c.index" :value="c.index">{{ c.name }}</option>
           </select>
-
-          <div v-if="dealType==='share' && shareGiveTargetZeroOnly" class="text-[10px] text-gray-500 mt-2">
-            ✅ 상대가 0인 카드만 보여요 (상대가 ‘필요’한 카드만)
+          <div class="text-[11px] text-gray-500 mt-2">
+            <span v-if="needOnlyGive">✅ 체크1 ON: 상대 0인 카드만 뜹니다.</span>
+            <span v-else>✅ 체크1 OFF: 내 여유분이면 다 뜹니다.</span>
           </div>
         </div>
 
         <!-- 내가 받을 카드 -->
         <div class="bg-green-50 border border-green-100 rounded-xl p-3">
-          <div class="flex items-center justify-between mb-2">
-            <div class="text-xs font-extrabold text-green-700">
-              내가 받을 카드 (상대 여유분 2장↑)
-            </div>
-
-            <!-- ✅ 캡쳐처럼 오른쪽 체크박스 -->
-            <label v-if="dealType==='share'"
-                   class="flex items-center gap-2 text-[10px] font-extrabold text-green-800">
-              <input type="checkbox" v-model="shareNeedOnly" class="w-4 h-4">
-              내 0만
-            </label>
-          </div>
-
+          <div class="text-xs font-extrabold text-green-700 mb-2">내가 받을 카드 (상대 여유분 2장↑)</div>
           <select v-model.number="dealReceiveIndex" class="w-full p-3 bg-white border border-green-200 rounded-lg text-sm focus:outline-none">
             <option :value="null">선택해주세요</option>
-
-            <!-- 윈윈 -->
-            <option v-if="dealType==='winwin'" v-for="c in compareResult.winReceive" :key="'dr_w_'+c.index" :value="c.index">
-              {{ c.name }}
-            </option>
-
-            <!-- 나눔 -->
-            <option v-else v-for="c in shareReceiveOptions" :key="'dr_s_'+c.index" :value="c.index">
-              {{ c.name }}
-            </option>
+            <option v-for="c in dealReceiveList" :key="'dr_'+c.index" :value="c.index">{{ c.name }}</option>
           </select>
-
-          <div v-if="dealType==='share' && shareNeedOnly" class="text-[10px] text-gray-500 mt-2">
-            ✅ 내 0인 카드만 보여요 (받기요청 목적 유지)
+          <div class="text-[11px] text-gray-500 mt-2">
+            <span v-if="needOnlyReceive">✅ 체크2 ON: 내가 0인 카드만 뜹니다.</span>
+            <span v-else>✅ 체크2 OFF: 상대 여유분이면 다 뜹니다.</span>
           </div>
         </div>
 
@@ -505,14 +499,14 @@
     </div>
   </div>
 
-  <!-- 구해요 팝업 -->
+  <!-- 카드 0 보유자 찾기 팝업 (구함) -->
   <div v-if="showNeedsPopup" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showNeedsPopup = false">
     <div class="bg-white rounded-2xl w-full max-w-sm p-5 relative max-h-[85vh] overflow-y-auto shadow-2xl hide-scroll">
       <button @click="showNeedsPopup = false" class="absolute top-4 right-4 text-gray-300 hover:text-gray-500"><i class="fas fa-times"></i></button>
 
       <div class="mb-4">
-        <h3 class="text-lg font-extrabold text-gray-800">🧾 구해요 목록</h3>
-        <p class="text-xs text-gray-500 mt-1">0인 카드만 보여요. (여유분 보유자 수 표시)</p>
+        <h3 class="text-lg font-extrabold text-gray-800">🧾 구함 목록</h3>
+        <p class="text-xs text-gray-500 mt-1">내가 0인 카드만 보여요. (여유분 보유자 수 표시)</p>
       </div>
 
       <div class="mb-3 relative">
@@ -523,7 +517,7 @@
       <div v-if="needsLoading" class="flex justify-center py-10"><div class="loader"></div></div>
 
       <div v-else-if="needsListFiltered.length===0" class="text-center text-gray-400 py-10 bg-gray-50 rounded-xl">
-        🎉 구해요가 없어요!
+        🎉 구함이 없어요!
       </div>
 
       <div v-else class="space-y-2">
@@ -534,7 +528,7 @@
             <div class="font-extrabold text-gray-800 text-sm truncate">{{ item.name }}</div>
             <span class="text-[10px] px-2 py-1 rounded-full font-extrabold"
                   :class="item.owners>0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'">
-              보유자 {{ item.owners }}명
+              여유분 보유자 {{ item.owners }}명
             </span>
           </div>
           <div class="text-[11px] text-gray-500 mt-1">탭하면 보유자 찾기</div>
@@ -543,12 +537,12 @@
     </div>
   </div>
 
-  <!-- 보유자 찾기 -->
+  <!-- 보유자 찾기 팝업 -->
   <div v-if="showPopup" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showPopup = false">
     <div class="bg-white rounded-2xl w-full max-w-sm p-6 relative shadow-2xl">
-      <button @click="showPopup = false" class="absolute top-4 right-4 text-gray-300 hover:text-gray-500"><i class="fas fa-times text-xl"></i></button>
+      <button @click="showPopup = false" class="absolute top-4 right-4 text-gray-300 hover:text-gray-500"><i class="fas fa-times"></i></button>
       <h3 class="text-lg font-extrabold mb-1 text-gray-800">🤝 교환 도우미</h3>
-      <p class="text-xs text-gray-500 mb-6 border-b pb-2"><span class="text-pink-600 font-extrabold">{{ popupCardName }}</span> 보유자 찾기</p>
+      <p class="text-xs text-gray-500 mb-6 border-b pb-2"><span class="text-pink-600 font-extrabold">{{ popupCardName }}</span> 여유분(2장↑) 보유자 찾기</p>
 
       <div v-if="isLoading" class="flex justify-center py-8"><div class="loader"></div></div>
 
@@ -581,7 +575,7 @@
     </div>
   </div>
 
-  <!-- 67섭 시소: 앨범 설정 -->
+  <!-- ✅ 67섭 시소만: 앨범 설정 팝업 -->
   <div v-if="showAlbumSettingsPopup" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" @click.self="showAlbumSettingsPopup = false">
     <div class="bg-white rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto hide-scroll shadow-2xl">
       <div class="flex justify-between items-center mb-4">
@@ -606,9 +600,9 @@
     </div>
   </div>
 
-  <!-- 도움말 -->
+  <!-- 도움말 (✅ openHelp/closeHelp로 닫힘 버그 방지) -->
   <div v-if="showHelpPopup" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="closeHelp">
-    <div class="bg-white rounded-2xl w-full max-w-sm p-6 relative shadow-2xl">
+    <div class="bg-white rounded-2xl w-full max-w-sm p-6 relative shadow-2xl" @click.stop>
       <button @click="closeHelp" class="absolute top-4 right-4 text-gray-300 hover:text-gray-500"><i class="fas fa-times text-xl"></i></button>
 
       <h3 class="text-lg font-extrabold text-gray-800 mb-4 text-center">💡 사용 가이드</h3>
@@ -633,24 +627,27 @@
         <div class="flex gap-3">
           <div class="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-extrabold text-xs flex-none">2</div>
           <div>
-            <h4 class="text-sm font-extrabold text-gray-700">교환 방식</h4>
+            <h4 class="text-sm font-extrabold text-gray-700">거래 만들기 (체크 2개 규칙)</h4>
             <p class="text-xs text-gray-500 leading-snug">
-              멤버에서 상대 선택 → <b>거래 만들기</b><br>
-              - 🤝 <b>윈윈 교환</b>: 서로 필요한 카드(내0/상대0) 기반<br>
-              - 🎁 <b>나눔 교환</b>: 여유 카드끼리 교환(상대 카드도 줄어듦)
+              멤버 → 상대 선택 → <b>거래 만들기</b><br>
+              체크 상태로 거래 타입이 결정돼요.
             </p>
+
+            <div class="mt-2 text-[11px] text-gray-600 leading-snug bg-gray-50 border border-gray-200 rounded-lg p-2">
+              ✅ 체크1(주는 카드=상대 0만) + 체크2(받는 카드=내 0만) → <b class="text-red-600">윈윈 교환</b><br>
+              ✅ 체크1만 → <b class="text-blue-600">선물·기부</b> (받는 카드는 자유)<br>
+              ✅ 체크2만 → <b class="text-green-700">구함</b> (주는 카드는 자유)
+            </div>
           </div>
         </div>
 
-        <!-- ✅ 나눔 옵션 설명 추가 -->
         <div class="flex gap-3">
           <div class="w-6 h-6 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-extrabold text-xs flex-none">3</div>
           <div>
-            <h4 class="text-sm font-extrabold text-gray-700">나눔 교환 옵션(체크박스)</h4>
+            <h4 class="text-sm font-extrabold text-gray-700">교환 횟수(중요)</h4>
             <p class="text-xs text-gray-500 leading-snug">
-              나눔 교환에서 체크박스를 켜면 카드 목록이 줄어요!<br>
-              - <b>내 0만</b>: 받는 카드를 “내가 0인 카드”로만 제한 (받기요청 느낌)<br>
-              - <b>상대 0만</b>: 주는 카드를 “상대가 0인 카드”로만 제한 (상대가 필요한 카드만)
+              “거래 기록” 1번 = 오늘 교환 1회로 처리돼요.<br>
+              (나/상대 각각 1회씩 카운트)
             </p>
           </div>
         </div>
@@ -659,7 +656,7 @@
           <div class="w-6 h-6 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center font-extrabold text-xs flex-none">4</div>
           <div>
             <h4 class="text-sm font-extrabold text-gray-700">복사 & 붙여넣기</h4>
-            <p class="text-xs text-gray-500 leading-snug">문구 복사 버튼 → 게임 채팅창에 붙여넣기!</p>
+            <p class="text-xs text-gray-500 leading-snug">문구 복사 버튼을 눌러 게임 채팅창에 붙여넣으세요!</p>
           </div>
         </div>
       </div>
@@ -699,39 +696,50 @@
       const currentAlbumIdx = ref(0);
       const tradeCount = ref(0);
 
+      // popups
       const showPopup = ref(false);
       const showUserListPopup = ref(false);
       const showComparePopup = ref(false);
       const showHelpPopup = ref(false);
       const showNeedsPopup = ref(false);
+
+      // ✅ album settings popup (시소 전용)
       const showAlbumSettingsPopup = ref(false);
 
+      // needs
       const needsKeyword = ref('');
       const needsLoading = ref(false);
       const spareOwnerCounts = ref(Array(81).fill(0));
 
+      // lists
       const exchangeList = ref([]);
       const userList = ref([]);
       const compareTarget = ref({});
       const compareResult = ref({
-        winGive: [],
-        winReceive: [],
+        giveOnly: [],
+        receiveOnly: [],
         mySpareAll: [],
         targetSpareAll: []
       });
 
-      const compareWinOpen = ref(false);
-      const compareShareOpen = ref(false);
+      // compare folds
+      const compareFold = ref({ winwin:false, gift:false, need:false });
+      const toggleCompareFold = (k) => {
+        compareFold.value[k] = !compareFold.value[k];
+      };
 
+      // deal builder
       const showDealBuilder = ref(false);
-      const dealType = ref('winwin');
       const dealGiveIndex = ref(null);
       const dealReceiveIndex = ref(null);
 
-      // ✅ 나눔 옵션 2개
-      const shareNeedOnly = ref(true);              // 받는 카드: 내 0만
-      const shareGiveTargetZeroOnly = ref(false);   // 주는 카드: 상대 0만
+      // ✅ 체크박스 2개 (사진의 1/2)
+      // 1) 주는 카드: 상대 0만
+      // 2) 받는 카드: 내 0만
+      const needOnlyGive = ref(true);
+      const needOnlyReceive = ref(true);
 
+      // search/filter
       const searchKeyword = ref('');
       const memberFilter = ref('all');
 
@@ -740,15 +748,7 @@
         albumCovers: Array(9).fill("")
       });
 
-      // ✅ 공지
-      const defaultNoticeText = ref(
-        "공지 파일(notice.json)을 아직 못 불러왔어요.\n" +
-        "✅ 새로고침을 눌러도 안 되면:\n" +
-        "1) GitHub Pages에 notice.json이 같은 폴더(루트)에 있는지 확인\n" +
-        "2) 파일명이 notice.json 맞는지 확인\n" +
-        "3) 캐시 강새로고침(Ctrl+Shift+R)\n"
-      );
-
+      // ✅ 공지(Notice) - notice.json에서 읽음
       const notice = ref({ text: "", updatedAt: "" });
       const noticeOpen = ref(true);
 
@@ -760,6 +760,7 @@
         return Number(userData.value.server) === 67 && String(userData.value.nickname) === '시소';
       });
 
+      // ✅ 공지 접힘 상태 키 (유저별)
       const noticeKey = computed(() => {
         if (!userData.value) return "oq_notice_open_guest";
         return `oq_notice_open_S${userData.value.server}_${userData.value.nickname}`;
@@ -768,6 +769,7 @@
       const loadNoticeOpen = () => {
         try {
           const v = localStorage.getItem(noticeKey.value);
+          // 기본값: 펼침(true)
           if (v === null) { noticeOpen.value = true; return; }
           noticeOpen.value = v === "1";
         } catch (e) { noticeOpen.value = true; }
@@ -775,24 +777,32 @@
 
       const toggleNotice = () => {
         noticeOpen.value = !noticeOpen.value;
-        try { localStorage.setItem(noticeKey.value, noticeOpen.value ? "1" : "0"); } catch (e) {}
-      };
-
-      const loadNotice = async () => {
-        // ✅ 1) notice.json 시도 → 실패해도 defaultNoticeText로 최소 표시
         try {
-          const res = await fetch(`./notice.json?ts=${Date.now()}`, { cache: "no-store" });
-          if (!res.ok) throw new Error("notice.json 로드 실패");
-          const data = await res.json();
-          notice.value.text = typeof data.text === "string" ? data.text : "";
-          notice.value.updatedAt = data.updatedAt || "";
-        } catch (e) {
-          // 아예 안보이는 상황 방지: 텍스트는 비워도, 화면엔 defaultNoticeText가 뜸
-          notice.value.text = "";
-          notice.value.updatedAt = "";
-        }
+          localStorage.setItem(noticeKey.value, noticeOpen.value ? "1" : "0");
+        } catch (e) {}
       };
 
+      // ✅ 공지 로드 (GitHub Pages에서 경로 이슈 줄이기 위해 두 경로 모두 시도)
+      const loadNotice = async () => {
+        const tryUrls = [
+          `notice.json?ts=${Date.now()}`,
+          `./notice.json?ts=${Date.now()}`
+        ];
+        for (const url of tryUrls) {
+          try {
+            const res = await fetch(url, { cache: "no-store" });
+            if (!res.ok) throw new Error("fetch fail");
+            const data = await res.json();
+            notice.value.text = typeof data.text === "string" ? data.text : "";
+            notice.value.updatedAt = data.updatedAt || "";
+            return;
+          } catch (e) {}
+        }
+        notice.value.text = "";
+        notice.value.updatedAt = "";
+      };
+
+      // ✅ 도움말 open/close (ref 꼬임/안닫힘 버그 방지)
       const openHelp = () => { showHelpPopup.value = true; };
       const closeHelp = () => { showHelpPopup.value = false; };
 
@@ -906,7 +916,7 @@
         }
       };
 
-      // 본인 초기화
+      // ✅ 본인 카드만 초기화 - "초기화" 입력 필수
       const resetMyCards = async () => {
         if (!userData.value) return;
 
@@ -936,7 +946,7 @@
           });
 
           userData.value.collection = zero;
-          localStorage.setItem('oq_user_v4', JSON.stringify(userData.value));
+          localStorage.setItem('oq_user_v5', JSON.stringify(userData.value));
           alert("초기화 완료 ✅");
         } catch (e) {
           alert("초기화 실패: " + (e.message || e));
@@ -974,36 +984,34 @@
         const myCol = (userData.value && Array.isArray(userData.value.collection)) ? userData.value.collection : Array(81).fill(0);
         const targetCol = (targetUser && Array.isArray(targetUser.collection)) ? targetUser.collection : Array(81).fill(0);
 
-        const res = { winGive: [], winReceive: [], mySpareAll: [], targetSpareAll: [] };
+        const res = { giveOnly: [], receiveOnly: [], mySpareAll: [], targetSpareAll: [] };
 
         for (let i=0; i<81; i++) {
           const cardObj = { index: i, name: cardNameByIndex(i) };
 
-          const my = myCol[i] || 0;
-          const tg = targetCol[i] || 0;
-
-          const mySpare = my > 1;
-          const myNeed = my === 0;
-
-          const tgSpare = tg > 1;
-          const tgNeed = tg === 0;
-
-          if (mySpare && tgNeed) res.winGive.push(cardObj);
-          if (tgSpare && myNeed) res.winReceive.push(cardObj);
+          const mySpare = (myCol[i] || 0) > 1;
+          const myNeed = (myCol[i] || 0) === 0;
+          const targetSpare = (targetCol[i] || 0) > 1;
+          const targetNeed = (targetCol[i] || 0) === 0;
 
           if (mySpare) res.mySpareAll.push(cardObj);
-          if (tgSpare) res.targetSpareAll.push(cardObj);
+          if (targetSpare) res.targetSpareAll.push(cardObj);
+
+          if (mySpare && targetNeed) res.giveOnly.push(cardObj);
+          if (targetSpare && myNeed) res.receiveOnly.push(cardObj);
         }
 
         compareResult.value = res;
-        compareWinOpen.value = false;
-        compareShareOpen.value = false;
       };
 
       const openCompare = (targetUser) => {
         showUserListPopup.value = false;
         showPopup.value = false;
         if (!targetUser || !targetUser.id) return;
+
+        // fold 초기화(요약만)
+        compareFold.value = { winwin:false, gift:false, need:false };
+
         buildCompare(targetUser);
         showComparePopup.value = true;
       };
@@ -1013,11 +1021,15 @@
         const targetCol = (target && Array.isArray(target.collection)) ? target.collection : Array(81).fill(0);
         let give = false, receive = false;
         for (let i=0; i<81; i++) {
-          if (!give && (myCol[i] || 0) > 1 && (targetCol[i] || 0) === 0) give = true;
-          if (!receive && (targetCol[i] || 0) > 1 && (myCol[i] || 0) === 0) receive = true;
+          if (!give && (myCol[i] || 0) > 1 && (targetCol[i] || 0) === 0) give = true;         // 선물(상대 필요) 가능
+          if (!receive && (targetCol[i] || 0) > 1 && (myCol[i] || 0) === 0) receive = true;    // 구함(내 필요) 가능
           if (give && receive) break;
         }
-        return { give, receive, winwin: give && receive };
+        return {
+          gift: give,
+          need: receive,
+          winwin: give && receive
+        };
       };
 
       const isUserTradeClosed = (u) => {
@@ -1034,8 +1046,8 @@
 
         if (memberFilter.value === 'fav') list = list.filter(u => isFavorite(u.id));
         else if (memberFilter.value === 'winwin') list = list.filter(u => u.match && u.match.winwin);
-        else if (memberFilter.value === 'receive') list = list.filter(u => u.match && u.match.receive);
-        else if (memberFilter.value === 'give') list = list.filter(u => u.match && u.match.give);
+        else if (memberFilter.value === 'need') list = list.filter(u => u.match && u.match.need);
+        else if (memberFilter.value === 'gift') list = list.filter(u => u.match && u.match.gift);
 
         list.sort((a,b) => {
           const fa = isFavorite(a.id) ? 1 : 0;
@@ -1086,16 +1098,23 @@
         }
       };
 
-      const openDealBuilder = (type) => {
-        dealType.value = type; // winwin | share
+      // ✅ 거래 모드(체크 상태로 자동)
+      const dealMode = computed(() => {
+        if (needOnlyGive.value && needOnlyReceive.value) return 'winwin';
+        if (needOnlyGive.value && !needOnlyReceive.value) return 'gift';
+        if (!needOnlyGive.value && needOnlyReceive.value) return 'need';
+        return 'free'; // 둘다 OFF (원하면 숨길 수도 있음)
+      });
+
+      // ✅ 거래 만들기: 프리셋
+      const openDealBuilderPreset = (preset) => {
+        // preset: winwin | gift | need
+        if (preset === 'winwin') { needOnlyGive.value = true; needOnlyReceive.value = true; }
+        else if (preset === 'gift') { needOnlyGive.value = true; needOnlyReceive.value = false; }
+        else if (preset === 'need') { needOnlyGive.value = false; needOnlyReceive.value = true; }
+
         dealGiveIndex.value = null;
         dealReceiveIndex.value = null;
-
-        if (type === 'share') {
-          shareNeedOnly.value = true;
-          shareGiveTargetZeroOnly.value = false;
-        }
-
         showDealBuilder.value = true;
       };
 
@@ -1105,19 +1124,25 @@
         dealReceiveIndex.value = null;
       };
 
-      // ✅ 나눔: 받기옵션(내0) / 주기옵션(상대0)
-      const shareReceiveOptions = computed(() => {
-        const arr = compareResult.value.targetSpareAll || [];
-        if (!shareNeedOnly.value) return arr;
-        const myCol = (userData.value && Array.isArray(userData.value.collection)) ? userData.value.collection : Array(81).fill(0);
-        return arr.filter(c => (myCol[c.index] || 0) === 0);
+      const findCardObj = (idx) => ({ index: idx, name: cardNameByIndex(idx) });
+
+      // ✅ 드롭다운 리스트(체크에 따라 필터)
+      const dealGiveList = computed(() => {
+        // 기본: 내 여유분 2장↑
+        // 체크1 ON: 상대 0인 것만
+        const base = compareResult.value.mySpareAll || [];
+        if (!needOnlyGive.value) return base;
+        const tCol = compareTarget.value.collection || Array(81).fill(0);
+        return base.filter(c => (tCol[c.index] || 0) === 0);
       });
 
-      const shareGiveOptions = computed(() => {
-        const arr = compareResult.value.mySpareAll || [];
-        if (!shareGiveTargetZeroOnly.value) return arr;
-        const targetCol = (compareTarget.value && Array.isArray(compareTarget.value.collection)) ? compareTarget.value.collection : Array(81).fill(0);
-        return arr.filter(c => (targetCol[c.index] || 0) === 0);
+      const dealReceiveList = computed(() => {
+        // 기본: 상대 여유분 2장↑
+        // 체크2 ON: 내가 0인 것만
+        const base = compareResult.value.targetSpareAll || [];
+        if (!needOnlyReceive.value) return base;
+        const myCol = (userData.value && Array.isArray(userData.value.collection)) ? userData.value.collection : Array(81).fill(0);
+        return base.filter(c => (myCol[c.index] || 0) === 0);
       });
 
       const copyDealBuilderText = () => {
@@ -1132,21 +1157,23 @@
         const targetName = compareTarget.value.nickname;
 
         const giveName = cardNameByIndex(dealGiveIndex.value);
-        const receiveName = cardNameByIndex(dealReceiveIndex.value);
+        const recvName = cardNameByIndex(dealReceiveIndex.value);
 
-        const title = (dealType.value === 'winwin') ? '윈윈교환' : '나눔교환';
-        const optA = (dealType.value === 'share' && shareNeedOnly.value) ? '내0' : '';
-        const optB = (dealType.value === 'share' && shareGiveTargetZeroOnly.value) ? '상대0' : '';
-        const opt = (optA || optB) ? `\n(옵션: ${[optA,optB].filter(Boolean).join(', ')})` : '';
+        let modeText = '';
+        if (dealMode.value === 'winwin') modeText = '윈윈 교환';
+        else if (dealMode.value === 'gift') modeText = '선물/기부';
+        else if (dealMode.value === 'need') modeText = '구함';
+        else modeText = '교환';
 
         const text =
-          `[오피스퀸 ${title}] S${targetServer} ${targetName}님! S${myServer} ${myName}입니다.\n` +
+          `[오피스퀸] (${modeText}) S${targetServer} ${targetName}님! S${myServer} ${myName}입니다.\n` +
           `제가 [${giveName}] 드리고,\n` +
-          `저는 [${receiveName}] 받을게요!\n교환 가능하실까요?` + opt;
+          `저는 [${recvName}] 받을게요!\n가능하실까요?`;
 
         navigator.clipboard.writeText(text).then(() => alert("복사되었습니다! 📋\n게임 채팅창에 붙여넣기 하세요."));
       };
 
+      // ✅ 거래 기록 (users 업데이트 + trades 로그 저장)
       const confirmDeal = async () => {
         await checkAndResetDailyLimit();
         const today = getGameDate();
@@ -1161,14 +1188,22 @@
           return;
         }
 
-        const giveText = cardNameByIndex(dealGiveIndex.value);
-        const receiveText = cardNameByIndex(dealReceiveIndex.value);
-        const tName = compareTarget.value.nickname || '상대';
+        const giveName = cardNameByIndex(dealGiveIndex.value);
+        const recvName = cardNameByIndex(dealReceiveIndex.value);
+
+        const modeLabel =
+          (dealMode.value === 'winwin') ? '윈윈 교환' :
+          (dealMode.value === 'gift') ? '선물·기부' :
+          (dealMode.value === 'need') ? '구함' : '교환';
 
         const msg =
-          (dealType.value === 'winwin')
-          ? `🤝 윈윈 교환을 기록할까요?\n\n- 내가 줌: ${giveText}\n- 내가 받음: ${receiveText}\n\n(교환횟수: 나/${tName} 각 1회)`
-          : `🎁 나눔 교환을 기록할까요?\n\n- 내가 줌: ${giveText}\n- 내가 받음: ${receiveText}\n\n(교환횟수: 나/${tName} 각 1회)\n※ 상대 카드도 줄어듭니다.`;
+          `거래를 기록할까요?\n\n` +
+          `- 내가 줌: ${giveName}\n` +
+          `- 내가 받음: ${recvName}\n\n` +
+          `현재 모드: ${modeLabel}\n` +
+          `체크1(상대0만): ${needOnlyGive.value ? 'ON' : 'OFF'}\n` +
+          `체크2(내0만): ${needOnlyReceive.value ? 'ON' : 'OFF'}\n\n` +
+          `(교환횟수: 나/상대 각 1회 처리)`;
 
         if (!confirm(msg)) return;
 
@@ -1179,8 +1214,8 @@
           const myDocRef = db.collection('users').doc(myDocId);
           const targetDocRef = db.collection('users').doc(compareTarget.value.id);
 
-          const tradeRef = db.collection('trades').doc();
-          const now = firebase.firestore.FieldValue.serverTimestamp();
+          // trades 로그 doc ref 미리 만들기
+          const tradeDocRef = db.collection('trades').doc();
 
           await db.runTransaction(async (tx) => {
             const myDoc = await tx.get(myDocRef);
@@ -1204,21 +1239,25 @@
             const g = dealGiveIndex.value;
             const r = dealReceiveIndex.value;
 
+            // 공통: 주는 건 내 여유분 2장↑, 받는 건 상대 여유분 2장↑
             if ((myCol[g] || 0) <= 1) throw "오류: 내 여유분(2장↑)이 아닌 카드는 줄 수 없어요!";
             if ((targetCol[r] || 0) <= 1) throw "오류: 상대 여유분(2장↑)이 부족해요!";
 
-            if (dealType.value === 'winwin') {
-              if ((targetCol[g] || 0) !== 0) throw "오류: 상대가 이미 가진 카드라 윈윈 조건이 바뀌었어요.";
-              if ((myCol[r] || 0) !== 0) throw "오류: 나는 이미 가진 카드라 윈윈 조건이 바뀌었어요.";
-            } else {
-              // ✅ 나눔 옵션 검증
-              if (shareNeedOnly.value && (myCol[r] || 0) !== 0) throw "오류: '내 0만' 옵션이라 내가 0인 카드만 받을 수 있어요.";
-              if (shareGiveTargetZeroOnly.value && (targetCol[g] || 0) !== 0) throw "오류: '상대 0만' 옵션이라 상대가 0인 카드만 줄 수 있어요.";
+            // 체크1 ON이면: 상대가 0인 카드만 주기
+            if (needOnlyGive.value && (targetCol[g] || 0) !== 0) {
+              throw "오류: 체크1 ON 상태라 '상대가 0인 카드'만 줄 수 있어요.";
             }
 
-            // 실제 교환 반영
+            // 체크2 ON이면: 내가 0인 카드만 받기
+            if (needOnlyReceive.value && (myCol[r] || 0) !== 0) {
+              throw "오류: 체크2 ON 상태라 '내가 0인 카드'만 받을 수 있어요.";
+            }
+
+            // 실제 교환(항상 양쪽 수량 변동되게!)
             myCol[g]--; targetCol[g]++;
             myCol[r]++; targetCol[r]--;
+
+            const now = firebase.firestore.FieldValue.serverTimestamp();
 
             tx.update(myDocRef, {
               collection: myCol,
@@ -1235,18 +1274,32 @@
               lastUpdated: now
             });
 
-            tx.set(tradeRef, {
-              createdAt: now,
+            // ✅ trades 로그 저장
+            tx.set(tradeDocRef, {
               gameDate: today,
-              type: dealType.value,
-              shareNeedOnly: (dealType.value === 'share') ? !!shareNeedOnly.value : null,
-              shareGiveTargetZeroOnly: (dealType.value === 'share') ? !!shareGiveTargetZeroOnly.value : null,
-              from: { server: userData.value.server, nickname: userData.value.nickname, userId: myDocId },
-              to: { server: targetData.server, nickname: targetData.nickname, userId: compareTarget.value.id },
-              give: { index: g, name: cardNameByIndex(g) },
-              receive: { index: r, name: cardNameByIndex(r) }
+              createdAt: now,
+              mode: dealMode.value, // winwin | gift | need | free
+              checkbox1_targetZeroOnly: !!needOnlyGive.value,
+              checkbox2_meZeroOnly: !!needOnlyReceive.value,
+
+              giveIndex: g,
+              receiveIndex: r,
+              giveName: cardNameByIndex(g),
+              receiveName: cardNameByIndex(r),
+
+              from: {
+                userId: myDocId,
+                server: userData.value.server,
+                nickname: userData.value.nickname
+              },
+              to: {
+                userId: compareTarget.value.id,
+                server: compareTarget.value.server,
+                nickname: compareTarget.value.nickname
+              }
             });
 
+            // local states sync
             userData.value.collection = myCol;
             userData.value.dailyExchangeCount = myCount + 1;
             userData.value.dailyExchangeDate = today;
@@ -1258,10 +1311,14 @@
             compareTarget.value.isTradeClosed = ((targetCount + 1) >= 3);
           });
 
-          localStorage.setItem('oq_user_v4', JSON.stringify(userData.value));
+          localStorage.setItem('oq_user_v5', JSON.stringify(userData.value));
           alert(`거래 기록 완료! (오늘 ${tradeCount.value}/3회)`);
 
           buildCompare(compareTarget.value);
+
+          if (showUserListPopup.value) {
+            await fetchUsersAndShowList();
+          }
 
           closeDealBuilder();
         } catch (e) {
@@ -1358,7 +1415,7 @@
         if (next < 0) return;
 
         userData.value.collection[abs] = next;
-        localStorage.setItem('oq_user_v4', JSON.stringify(userData.value));
+        localStorage.setItem('oq_user_v5', JSON.stringify(userData.value));
 
         const docId = `S${userData.value.server}_${userData.value.nickname}`;
         db.collection('users').doc(docId).update({
@@ -1452,9 +1509,10 @@
           }
 
           userData.value = finalData;
-          localStorage.setItem('oq_user_v4', JSON.stringify(finalData));
+          localStorage.setItem('oq_user_v5', JSON.stringify(finalData));
           favSet.value = loadFavSet();
 
+          // ✅ 공지 접힘 상태 로드(반드시 userData 세팅 후)
           loadNoticeOpen();
 
           isLoggedIn.value = true;
@@ -1468,7 +1526,7 @@
       };
 
       const checkLogin = async () => {
-        const saved = localStorage.getItem('oq_user_v4');
+        const saved = localStorage.getItem('oq_user_v5') || localStorage.getItem('oq_user_v4');
         await loadNotice();
         if (!saved) return;
 
@@ -1487,6 +1545,7 @@
       checkLogin();
 
       const logout = () => {
+        localStorage.removeItem('oq_user_v5');
         localStorage.removeItem('oq_user_v4');
         userData.value = null;
         isLoggedIn.value = false;
@@ -1497,49 +1556,57 @@
         showComparePopup.value = false;
         showNeedsPopup.value = false;
         showDealBuilder.value = false;
-        showHelpPopup.value = false;
+        closeHelp();
       };
 
       return {
+        // auth/basic
         isLoggedIn, isLoading, loginForm, handleLogin, logout,
         userData,
 
+        // views
         currentView, currentAlbumIdx, currentAlbumCards,
         openAlbum, prevAlbum, nextAlbum,
         updateCount, onCardTap, onCardHoldStart, onCardHoldEnd,
         getAlbumCount, totalCount, totalProgress,
 
+        // top
         tradeCount,
         resetMyCards,
 
+        // notice
         notice, noticeOpen, toggleNotice, loadNotice,
-        defaultNoticeText,
 
+        // help
         showHelpPopup, openHelp, closeHelp,
 
+        // popups
         showPopup, showUserListPopup, showComparePopup,
         showNeedsPopup, openNeedsPopup, needsKeyword, needsListFiltered, needsLoading,
 
+        // exchange
         openExchangeByAbsoluteIndex, exchangeList, popupCardName,
 
+        // member list
         fetchUsersAndShowList, userList, filteredUserList, searchKeyword, memberFilter,
         toggleFavorite, isFavorite,
 
+        // compare
         openCompare, compareTarget, compareResult,
-        compareWinOpen, compareShareOpen,
+        compareFold, toggleCompareFold,
 
-        showDealBuilder, dealType, dealGiveIndex, dealReceiveIndex,
-        openDealBuilder, closeDealBuilder,
-        copyDealBuilderText,
-        confirmDeal,
+        // deal builder
+        showDealBuilder,
+        dealGiveIndex, dealReceiveIndex,
+        needOnlyGive, needOnlyReceive,
+        dealMode, dealGiveList, dealReceiveList,
+        openDealBuilderPreset, closeDealBuilder,
+        copyDealBuilderText, confirmDeal,
 
-        shareNeedOnly,
-        shareGiveTargetZeroOnly,
-        shareReceiveOptions,
-        shareGiveOptions,
-
+        // helpers
         getActiveText, getActiveColor,
 
+        // config
         appConfig,
         canEditAlbums,
         showAlbumSettingsPopup,
