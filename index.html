@@ -242,7 +242,7 @@
     </div>
   </div>
 
-  <!-- 비교 팝업 (교환추천 1개 카드) -->
+  <!-- 비교 팝업 (요약보기 버튼 삭제 + 항상 펼침) -->
   <div v-if="showComparePopup" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showComparePopup = false">
     <div class="bg-white rounded-2xl w-full max-w-sm p-5 relative max-h-[85vh] overflow-y-auto shadow-2xl hide-scroll">
       <button @click="showComparePopup = false" class="absolute top-3 right-3 text-gray-300 hover:text-gray-500"><i class="fas fa-times"></i></button>
@@ -271,7 +271,7 @@
 
       <div v-else class="space-y-3">
 
-        <!-- ⭐ 교환 추천 카드 -->
+        <!-- ⭐ 교환 추천 카드 (항상 펼침) -->
         <div class="bg-red-50 p-3 rounded-xl border border-red-100">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -281,14 +281,9 @@
                 내가 받을 수 있음 <b class="text-red-600">{{ compareResult.receiveOnly.length }}</b>개
               </span>
             </div>
-
-            <button @click="toggleSummary('swap')"
-                    class="text-[10px] text-red-600 font-extrabold btn-press px-2 py-1 rounded-lg hover:bg-white/70">
-              {{ summaryOpen.swap ? '요약 닫기 ▲' : '요약 보기 ▼' }}
-            </button>
           </div>
 
-          <div v-if="summaryOpen.swap" class="mt-3 space-y-3">
+          <div class="mt-3 space-y-3">
             <!-- 주기 목록 -->
             <div>
               <div class="text-[11px] font-extrabold text-gray-700 mb-1">
@@ -344,7 +339,7 @@
     </div>
   </div>
 
-  <!-- 거래 만들기 팝업 (체크 2개로 교환/선물/구함 자동 결정) -->
+  <!-- 거래 만들기 팝업 -->
   <div v-if="showDealBuilder" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="closeDealBuilder">
     <div class="bg-white rounded-2xl w-full max-w-sm p-5 relative shadow-2xl">
       <button @click="closeDealBuilder" class="absolute top-3 right-3 text-gray-300 hover:text-gray-500"><i class="fas fa-times"></i></button>
@@ -354,12 +349,12 @@
         <div class="text-lg font-extrabold text-gray-800 flex items-center gap-2">
           <span v-if="dealModeLabel==='교환'">❤️ 교환</span>
           <span v-else-if="dealModeLabel==='선물'">🎁 선물</span>
-          <span v-else>🔎 구함</span>
+          <span v-else-if="dealModeLabel==='구함'">🔎 구함</span>
+          <span v-else>✅ 체크 선택</span>
           <span class="text-sm font-bold text-gray-500">/ S{{ compareTarget.server }} {{ compareTarget.nickname }}</span>
         </div>
       </div>
 
-      <!-- 체크 영역(오른쪽 설명 느낌으로) -->
       <div class="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-3">
         <div class="text-[11px] font-extrabold text-gray-700 mb-2">체크로 거래 종류가 결정돼요</div>
 
@@ -400,7 +395,6 @@
 
       <div class="space-y-3">
 
-        <!-- 줄 카드 -->
         <div v-if="dealCheckGive" class="bg-blue-50 border border-blue-100 rounded-xl p-3">
           <div class="text-xs font-extrabold text-blue-700 mb-2">내가 줄 카드</div>
           <select v-model.number="dealGiveIndex" class="w-full p-3 bg-white border border-blue-200 rounded-lg text-sm focus:outline-none">
@@ -410,7 +404,6 @@
           <div class="text-[10px] text-gray-500 mt-2">* 선물은 상대가 0인 카드만 가능</div>
         </div>
 
-        <!-- 받을 카드 -->
         <div v-if="dealCheckReceive" class="bg-green-50 border border-green-100 rounded-xl p-3">
           <div class="text-xs font-extrabold text-green-800 mb-2">내가 받을 카드</div>
           <select v-model.number="dealReceiveIndex" class="w-full p-3 bg-white border border-green-200 rounded-lg text-sm focus:outline-none">
@@ -541,7 +534,7 @@
     </div>
   </div>
 
-  <!-- 도움말 (openHelp/closeHelp로만 제어) -->
+  <!-- 도움말 -->
   <div v-if="showHelpPopup" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="closeHelp">
     <div class="bg-white rounded-2xl w-full max-w-sm p-6 relative shadow-2xl">
       <button @click="closeHelp" class="absolute top-4 right-4 text-gray-300 hover:text-gray-500"><i class="fas fa-times text-xl"></i></button>
@@ -568,10 +561,10 @@
         <div class="flex gap-3">
           <div class="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-extrabold text-xs flex-none">2</div>
           <div>
-            <h4 class="text-sm font-extrabold text-gray-700">교환 추천(핵심)</h4>
+            <h4 class="text-sm font-extrabold text-gray-700">교환 추천</h4>
             <p class="text-xs text-gray-500 leading-snug">
               멤버에서 상대 선택 → <b>교환 추천</b>에서<br>
-              내가 줄 수 있는/받을 수 있는 카드를 확인해요.
+              내가 줄 수 있는/받을 수 있는 카드가 항상 펼쳐서 보여요.
             </p>
           </div>
         </div>
@@ -656,13 +649,9 @@
       const compareTarget = ref({});
       const compareResult = ref({ giveOnly: [], receiveOnly: [] });
 
-      // compare summary toggle
-      const summaryOpen = ref({ swap: false });
-      const toggleSummary = (k) => { summaryOpen.value[k] = !summaryOpen.value[k]; };
-
       // deal builder (checkbox)
-      const dealCheckGive = ref(true);     // 1) 내가 줄 카드
-      const dealCheckReceive = ref(true);  // 2) 내가 받을 카드
+      const dealCheckGive = ref(true);
+      const dealCheckReceive = ref(true);
       const dealGiveIndex = ref(null);
       const dealReceiveIndex = ref(null);
 
@@ -684,11 +673,10 @@
         return Number(userData.value.server) === 67 && String(userData.value.nickname) === '시소';
       });
 
-      // ===== 도움말 open/close (안닫힘 버그 방지) =====
       const openHelp = () => { showHelpPopup.value = true; };
       const closeHelp = () => { showHelpPopup.value = false; };
 
-      // ===== 시간/활동 =====
+      // ===== 날짜(게임 기준) =====
       const getGameDate = () => {
         const now = new Date();
         if (now.getHours() < 8) now.setDate(now.getDate() - 1);
@@ -798,7 +786,7 @@
         }
       };
 
-      // ===== 내 카드 초기화 (문구 입력) =====
+      // ===== 내 카드 초기화 =====
       const resetMyCards = async () => {
         if (!userData.value) return;
         const phrase = "초기화";
@@ -971,7 +959,7 @@
         persistCollection();
       };
 
-      // 탭: 0이면 보유자, 아니면 +1
+      // 탭/홀드
       let holdTimer = null;
       let holdTriggered = false;
 
@@ -1029,18 +1017,14 @@
           const uHaveSpare = (targetCol[i] || 0) > 1;
           const uNeed = (targetCol[i] || 0) === 0;
 
-          // 선물 후보: 내 여유 + 상대 0
-          if (iHaveSpare && uNeed) res.giveOnly.push(cardObj);
-          // 구함 후보: 상대 여유 + 내 0
-          if (uHaveSpare && iNeed) res.receiveOnly.push(cardObj);
+          if (iHaveSpare && uNeed) res.giveOnly.push(cardObj);      // 선물 후보
+          if (uHaveSpare && iNeed) res.receiveOnly.push(cardObj);   // 구함 후보
         }
 
         compareResult.value = res;
-        summaryOpen.value.swap = false;
       };
 
       const openCompare = (targetUser) => {
-        // ✅ 버그 방지: 여기서 무조건 compare popup 열기
         if (!targetUser || !targetUser.id) return;
         showUserListPopup.value = false;
         showPopup.value = false;
@@ -1104,7 +1088,6 @@
       };
 
       const openMemberPopup = async () => {
-        // ✅ 멤버 눌렀는데 아무것도 안 뜨는 버그 방지: 여기서 확실히 열고 로드
         showUserListPopup.value = true;
         searchKeyword.value = '';
         memberFilter.value = 'all';
@@ -1120,13 +1103,12 @@
       });
 
       const openDealBuilder = () => {
-        // 기본값: 가능한 게 있으면 둘 다 체크, 아니면 가능한 쪽만
         const canGive = (compareResult.value.giveOnly || []).length > 0;
         const canReceive = (compareResult.value.receiveOnly || []).length > 0;
 
         dealCheckGive.value = canGive;
         dealCheckReceive.value = canReceive;
-        if (!canGive && !canReceive) { dealCheckGive.value = true; dealCheckReceive.value = true; } // 그냥 열리게
+        if (!canGive && !canReceive) { dealCheckGive.value = true; dealCheckReceive.value = true; }
 
         dealGiveIndex.value = null;
         dealReceiveIndex.value = null;
@@ -1140,23 +1122,13 @@
         dealReceiveIndex.value = null;
       };
 
-      // 체크가 꺼지면 해당 선택값 초기화
       watch(dealCheckGive, (v) => { if (!v) dealGiveIndex.value = null; });
       watch(dealCheckReceive, (v) => { if (!v) dealReceiveIndex.value = null; });
 
       const copyDealBuilderText = () => {
-        if (!dealCheckGive.value && !dealCheckReceive.value) {
-          alert("체크를 최소 1개는 켜주세요!");
-          return;
-        }
-        if (dealCheckGive.value && dealGiveIndex.value === null) {
-          alert("내가 줄 카드를 선택해주세요!");
-          return;
-        }
-        if (dealCheckReceive.value && dealReceiveIndex.value === null) {
-          alert("내가 받을 카드를 선택해주세요!");
-          return;
-        }
+        if (!dealCheckGive.value && !dealCheckReceive.value) { alert("체크를 최소 1개는 켜주세요!"); return; }
+        if (dealCheckGive.value && dealGiveIndex.value === null) { alert("내가 줄 카드를 선택해주세요!"); return; }
+        if (dealCheckReceive.value && dealReceiveIndex.value === null) { alert("내가 받을 카드를 선택해주세요!"); return; }
 
         const myServer = userData.value.server;
         const myName = userData.value.nickname;
@@ -1188,10 +1160,7 @@
         await checkAndResetDailyLimit();
         const today = getGameDate();
 
-        if (!dealCheckGive.value && !dealCheckReceive.value) {
-          alert("체크를 최소 1개는 켜주세요!");
-          return;
-        }
+        if (!dealCheckGive.value && !dealCheckReceive.value) { alert("체크를 최소 1개는 켜주세요!"); return; }
         if (dealCheckGive.value && dealGiveIndex.value === null) { alert("내가 줄 카드를 선택해주세요!"); return; }
         if (dealCheckReceive.value && dealReceiveIndex.value === null) { alert("내가 받을 카드를 선택해주세요!"); return; }
 
@@ -1217,7 +1186,6 @@
           const useGive = dealCheckGive.value;
           const useReceive = dealCheckReceive.value;
 
-          // trades 로그 payload
           const tradePayload = {
             type: (useGive && useReceive) ? "exchange" : (useGive ? "gift" : "need"),
             typeLabel: (useGive && useReceive) ? "교환" : (useGive ? "선물" : "구함"),
@@ -1251,7 +1219,6 @@
             const myCol = Array.isArray(myData.collection) ? [...myData.collection] : Array(81).fill(0);
             const targetCol = Array.isArray(targetData.collection) ? [...targetData.collection] : Array(81).fill(0);
 
-            // 줄 카드: 내 여유(2↑) & 상대 0
             if (useGive) {
               const idx = dealGiveIndex.value;
               if ((myCol[idx] || 0) < 2) throw new Error("내 카드가 여유(2장↑)가 아니라서 불가해요.");
@@ -1260,7 +1227,6 @@
               targetCol[idx] = (targetCol[idx] || 0) + 1;
             }
 
-            // 받을 카드: 내 0 & 상대 여유(2↑)
             if (useReceive) {
               const idx = dealReceiveIndex.value;
               if ((targetCol[idx] || 0) < 2) throw new Error("상대 카드가 여유(2장↑)가 아니라서 불가해요.");
@@ -1287,28 +1253,21 @@
               lastActive: now
             });
 
-            // ✅ trades 로그도 같이 저장
             tx.set(db.collection('trades').doc(), tradePayload);
 
-            // 로컬 상태 반영(내 것만)
             userData.value.collection = myCol;
             userData.value.dailyExchangeCount = myCount + 1;
             userData.value.dailyExchangeDate = today;
             tradeCount.value = myCount + 1;
 
-            // 비교용 타겟도 화면에서 재계산될 수 있게만 갱신
             compareTarget.value.collection = targetCol;
           });
 
           localStorage.setItem('oq_user_v4', JSON.stringify(userData.value));
           alert(`거래 기록 완료! (오늘 ${tradeCount.value}/3회)`);
 
-          // 비교 UI 갱신
           buildCompare(compareTarget.value);
-
-          // 멤버 리스트가 열려있다면 뱃지/마감 갱신
           if (showUserListPopup.value) await fetchUsersAndShowList();
-
           closeDealBuilder();
         } catch (e) {
           alert("거래 실패: " + (e.message || e));
@@ -1400,40 +1359,30 @@
       };
 
       return {
-        // auth/basic
         isLoggedIn, isLoading, loginForm, handleLogin, logout,
         userData,
 
-        // help
         showHelpPopup, openHelp, closeHelp,
 
-        // views
         currentView, currentAlbumIdx, currentAlbumCards,
         openAlbum, prevAlbum, nextAlbum,
         updateCount, onCardTap, onCardHoldStart, onCardHoldEnd,
         getAlbumCount, totalCount, totalProgress,
 
-        // top
         tradeCount,
         resetMyCards,
 
-        // popups
         showPopup, showUserListPopup, showComparePopup,
         showNeedsPopup, openNeedsPopup, needsKeyword, needsListFiltered, needsLoading,
 
-        // exchange
         openExchangeByAbsoluteIndex, exchangeList, popupCardName,
 
-        // member list
         openMemberPopup,
-        fetchUsersAndShowList, filteredUserList, searchKeyword, memberFilter,
+        filteredUserList, searchKeyword, memberFilter,
         toggleFavorite, isFavorite,
 
-        // compare
         openCompare, compareTarget, compareResult,
-        summaryOpen, toggleSummary,
 
-        // deal builder
         showDealBuilder,
         openDealBuilder, closeDealBuilder,
         dealCheckGive, dealCheckReceive,
@@ -1442,10 +1391,8 @@
         copyDealBuilderText,
         confirmDeal,
 
-        // helpers
         getActiveText, getActiveColor,
 
-        // config
         appConfig,
         canEditAlbums,
         showAlbumSettingsPopup,
